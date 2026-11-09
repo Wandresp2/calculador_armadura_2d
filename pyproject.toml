@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "armadura-2d-andresdperezc"
+version = "0.1.0"
+description = "Analizador de armaduras 2D isostáticas: fuerzas internas, reacciones, tensión/compresión y gráficos."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Andrés David Pérez Criollo", email = "adperezc@udistrital.edu.co" },
+]
+keywords = ["armadura", "estática", "mecánica vectorial", "educación"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy>=1.22",
+    "matplotlib>=3.5",
+]
+
+[project.optional-dependencies]
+gui = ["streamlit>=1.28"]
+dev = ["pytest>=7", "build", "twine", "jupyter", "ipykernel"]
+docs = ["sphinx", "furo", "myst-parser", "rinohtype", "ziamath"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
