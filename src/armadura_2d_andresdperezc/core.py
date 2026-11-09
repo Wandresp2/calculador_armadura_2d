@@ -1,7 +1,8 @@
 """Núcleo del analizador de armaduras 2D isostáticas.
 
 Este módulo no depende de Streamlit ni de Tkinter. Resuelve el equilibrio
-nodal A x = b con NumPy. Los gráficos van en la fase 4.
+nodal A x = b con NumPy. ``graficar`` devuelve una Figure de matplotlib
+(no abre ventanas).
 """
 
 from __future__ import annotations
@@ -18,13 +19,6 @@ __all__ = [
     "ChequeoEquilibrio",
     "ResultadoArmadura",
 ]
-
-
-def _fase_pendiente(fase, metodo):
-    raise NotImplementedError(
-        f"{metodo} se implementa en la fase {fase} "
-        "(ver CONTEXTO_DESARROLLO.md)."
-    )
 
 
 def _entero(valor, nombre):
@@ -173,6 +167,21 @@ class Armadura2D:
 
     EPS_FUERZA_NULA = 1e-8
     """Umbral |N| para clasificar una barra como ``nula``."""
+
+    COLOR_TENSION = "#1A6B7A"
+    """Teal: barra a tracción (como en el PPT del curso)."""
+
+    COLOR_COMPRESION = "#C9A227"
+    """Oro: barra a compresión."""
+
+    COLOR_NULA = "#7F8C8D"
+    """Gris: fuerza nula o barra aún sin resultado."""
+
+    COLOR_CARGA = "#A83226"
+    """Rojo: cargas externas."""
+
+    COLOR_REACCION = "#1F6FA5"
+    """Azul: reacciones en apoyos."""
 
     def __init__(self, nombre="armadura"):
         self._nombre = str(nombre)
@@ -477,14 +486,247 @@ class Armadura2D:
         return self._chequear(resultado.fuerzas, resultado.reacciones)
 
     def graficar(self, resultado=None):
-        """Devuelve una ``matplotlib.figure.Figure`` de la armadura.
+        """Dibuja la armadura: barras T/C, nudos, apoyos, cargas y reacciones.
+
+        No llama a ``plt.show()``. En tests, scripts y Docker usar backend Agg.
+
+        Parameters
+        ----------
+        resultado : ResultadoArmadura, optional
+            Si se omite, se llama a ``resolver()``.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
 
         Raises
         ------
-        NotImplementedError
-            Hasta la fase 4.
+        ValueError
+            Si no hay nudos o ``resultado`` no es un ``ResultadoArmadura``.
         """
-        _fase_pendiente(4, "graficar")
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Circle, Polygon
+
+        if not self._nodos:
+            raise ValueError("La armadura no tiene nudos.")
+        if resultado is None:
+            resultado = self.resolver()
+        if not isinstance(resultado, ResultadoArmadura):
+            raise ValueError(
+                "resultado debe ser un ResultadoArmadura; "
+                f"se recibió {type(resultado)!r}."
+            )
+
+        fuerzas = {barra.id: barra for barra in resultado.fuerzas}
+        span = self._span_dibujo()
+        fig, ax = plt.subplots(figsize=(8.0, 6.0), layout="constrained")
+
+        vistos = set()
+        for barra_id, (nudo_i, nudo_j) in self._barras.items():
+            x_i, y_i = self._nodos[nudo_i]
+            x_j, y_j = self._nodos[nudo_j]
+            dato = fuerzas.get(barra_id)
+            tipo = dato.tipo if dato is not None else "nula"
+            color = self._color_tipo(tipo)
+            etiqueta = None
+            if tipo not in vistos:
+                etiqueta = {
+                    "tension": "tensión",
+                    "compresion": "compresión",
+                    "nula": "nula",
+                }[tipo]
+                vistos.add(tipo)
+            ax.plot(
+                [x_i, x_j],
+                [y_i, y_j],
+                color=color,
+                linewidth=2.6,
+                solid_capstyle="round",
+                label=etiqueta,
+                zorder=2,
+            )
+            mx, my = (x_i + x_j) / 2.0, (y_i + y_j) / 2.0
+            dx, dy = x_j - x_i, y_j - y_i
+            largo = math.hypot(dx, dy) or 1.0
+            nx, ny = -dy / largo, dx / largo
+            off = 0.045 * span
+            texto = barra_id
+            if dato is not None:
+                texto = f"{barra_id}\n{dato.fuerza:.1f} kN"
+            ax.text(
+                mx + off * nx,
+                my + off * ny,
+                texto,
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="#1C2333",
+                zorder=4,
+            )
+
+        radio_nudo = 0.035 * span
+        for nudo, (x, y) in self._nodos.items():
+            ax.add_patch(
+                Circle(
+                    (x, y),
+                    radio_nudo,
+                    facecolor="#F6F3EC",
+                    edgecolor="#0B1F3A",
+                    linewidth=1.4,
+                    zorder=5,
+                )
+            )
+            ax.text(
+                x,
+                y + 1.7 * radio_nudo,
+                str(nudo),
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                fontweight="bold",
+                color="#0B1F3A",
+                zorder=6,
+            )
+            tipo_apoyo = self._apoyos.get(nudo)
+            if tipo_apoyo == "fijo":
+                self._dibujar_apoyo_fijo(ax, x, y, span, Polygon)
+            elif tipo_apoyo == "movil":
+                self._dibujar_apoyo_movil(ax, x, y, span, Circle, Polygon)
+
+        vectores = []
+        for nudo, (fx, fy) in self._cargas.items():
+            vectores.append((fx, fy))
+        for rec in resultado.reacciones:
+            vectores.append((rec.rx, rec.ry))
+        f_max = max((math.hypot(fx, fy) for fx, fy in vectores), default=1.0)
+        if f_max <= 0.0:
+            f_max = 1.0
+
+        hubo_carga = False
+        for nudo, (fx, fy) in self._cargas.items():
+            if math.hypot(fx, fy) <= self.EPS_FUERZA_NULA:
+                continue
+            x, y = self._nodos[nudo]
+            self._flecha(
+                ax, x, y, fx, fy, span, f_max, self.COLOR_CARGA, hacia_nudo=True
+            )
+            hubo_carga = True
+        if hubo_carga:
+            ax.plot([], [], color=self.COLOR_CARGA, lw=1.8, label="carga")
+
+        hubo_reaccion = False
+        for rec in resultado.reacciones:
+            if math.hypot(rec.rx, rec.ry) <= self.EPS_FUERZA_NULA:
+                continue
+            x, y = self._nodos[rec.nudo]
+            self._flecha(
+                ax,
+                x,
+                y,
+                rec.rx,
+                rec.ry,
+                span,
+                f_max,
+                self.COLOR_REACCION,
+                hacia_nudo=False,
+            )
+            hubo_reaccion = True
+        if hubo_reaccion:
+            ax.plot([], [], color=self.COLOR_REACCION, lw=1.8, label="reacción")
+
+        ax.set_aspect("equal")
+        ax.set_xlabel("x (m)")
+        ax.set_ylabel("y (m)")
+        ax.set_title(f"{self._nombre}  ·  + tensión  /  − compresión")
+        ax.grid(True, alpha=0.25)
+        xs = [xy[0] for xy in self._nodos.values()]
+        ys = [xy[1] for xy in self._nodos.values()]
+        margen = 0.28 * span
+        ax.set_xlim(min(xs) - margen, max(xs) + margen)
+        ax.set_ylim(min(ys) - margen, max(ys) + margen)
+        ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
+        return fig
+
+    def _color_tipo(self, tipo):
+        return {
+            "tension": self.COLOR_TENSION,
+            "compresion": self.COLOR_COMPRESION,
+            "nula": self.COLOR_NULA,
+        }.get(tipo, self.COLOR_NULA)
+
+    def _span_dibujo(self):
+        xs = [xy[0] for xy in self._nodos.values()]
+        ys = [xy[1] for xy in self._nodos.values()]
+        return max(max(xs) - min(xs), max(ys) - min(ys), 1.0)
+
+    def _flecha(self, ax, x, y, fx, fy, span, f_max, color, hacia_nudo):
+        mag = math.hypot(fx, fy)
+        if mag <= 0.0:
+            return
+        largo = 0.32 * span * (mag / f_max)
+        dx = largo * fx / mag
+        dy = largo * fy / mag
+        if hacia_nudo:
+            cola = (x - dx, y - dy)
+            cabeza = (x, y)
+        else:
+            cola = (x, y)
+            cabeza = (x + dx, y + dy)
+        ax.annotate(
+            "",
+            xy=cabeza,
+            xytext=cola,
+            arrowprops=dict(
+                arrowstyle="-|>",
+                color=color,
+                lw=1.7,
+                mutation_scale=11,
+            ),
+            zorder=7,
+        )
+
+    def _dibujar_apoyo_fijo(self, ax, x, y, span, polygon_cls):
+        t = 0.08 * span
+        triangulo = polygon_cls(
+            [(x, y), (x - 0.7 * t, y - t), (x + 0.7 * t, y - t)],
+            closed=True,
+            facecolor="#C9A227",
+            edgecolor="#0B1F3A",
+            linewidth=1.0,
+            zorder=3,
+        )
+        ax.add_patch(triangulo)
+        ax.plot(
+            [x - 1.1 * t, x + 1.1 * t],
+            [y - t, y - t],
+            color="#0B1F3A",
+            lw=1.4,
+            zorder=3,
+        )
+
+    def _dibujar_apoyo_movil(self, ax, x, y, span, circle_cls, polygon_cls):
+        t = 0.08 * span
+        triangulo = polygon_cls(
+            [(x, y), (x - 0.7 * t, y - 0.75 * t), (x + 0.7 * t, y - 0.75 * t)],
+            closed=True,
+            facecolor="#C9A227",
+            edgecolor="#0B1F3A",
+            linewidth=1.0,
+            zorder=3,
+        )
+        ax.add_patch(triangulo)
+        radio = 0.16 * t
+        for signo in (-1, 1):
+            ax.add_patch(
+                circle_cls(
+                    (x + signo * 0.28 * t, y - 0.75 * t - radio),
+                    radio,
+                    facecolor="#F6F3EC",
+                    edgecolor="#0B1F3A",
+                    linewidth=1.0,
+                    zorder=3,
+                )
+            )
 
     @classmethod
     def preset_triangulo(cls):

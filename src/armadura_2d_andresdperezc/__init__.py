@@ -9,6 +9,7 @@ Uso rápido::
     print(r.equilibrio.ok)
     for barra in r.fuerzas:
         print(barra.id, barra.tipo, barra.fuerza)
+    a.graficar(r)  # Figure de matplotlib; no abre ventana
 """
 
 from .core import (

@@ -11,7 +11,7 @@ from armadura_2d_andresdperezc import Armadura2D
 
 Versión **0.1.0**. Python **≥ 3.10**. Licencia **MIT**.
 
-La GUI de Streamlit **no** forma parte del paquete (llegará en una fase posterior, fuera de `src/`). Los cuatro presets (**Triángulo**, **Warren**, **Pratt**, **Howe**) ya se resuelven; los gráficos siguen pendientes.
+La GUI de Streamlit **no** forma parte del paquete (llegará en una fase posterior, fuera de `src/`). Los cuatro presets (**Triángulo**, **Warren**, **Pratt**, **Howe**) se resuelven y `graficar()` devuelve una figura matplotlib (tensión/compresión).
 
 ## Instalación de desarrollo
 
@@ -30,6 +30,7 @@ r = a.resolver()
 print(r.equilibrio.ok)
 for barra in r.fuerzas:
     print(barra.id, barra.tipo, barra.fuerza)
+a.graficar(r)
 ```
 
 ```powershell

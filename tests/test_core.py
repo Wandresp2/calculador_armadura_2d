@@ -2,7 +2,13 @@
 
 import math
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 import pytest
+from matplotlib.figure import Figure
+from matplotlib.patches import Circle, Polygon
 
 from armadura_2d_andresdperezc import (
     Armadura2D,
@@ -12,6 +18,14 @@ from armadura_2d_andresdperezc import (
 )
 
 SQRT13 = math.sqrt(13)
+
+
+@pytest.fixture(autouse=True)
+def _cerrar_figuras():
+    yield
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
 
 
 def _fuerzas(resultado):
@@ -233,3 +247,39 @@ def test_warren_resuelve_sin_gui():
     resultado = Armadura2D.preset_warren().resolver()
     assert len(resultado.fuerzas) == 7
     assert resultado.equilibrio.ok
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        Armadura2D.preset_triangulo,
+        Armadura2D.preset_warren,
+        Armadura2D.preset_pratt,
+        Armadura2D.preset_howe,
+    ],
+)
+def test_graficar_devuelve_figura(factory):
+    figura = factory().graficar()
+    assert isinstance(figura, Figure)
+    assert len(figura.axes) == 1
+    assert figura.axes[0].get_legend() is not None
+    parches = figura.axes[0].patches
+    assert any(isinstance(p, Circle) for p in parches)
+    assert any(isinstance(p, Polygon) for p in parches)
+
+
+def test_graficar_con_resultado_explicito():
+    armadura = Armadura2D.preset_triangulo()
+    resultado = armadura.resolver()
+    figura = armadura.graficar(resultado)
+    assert isinstance(figura, Figure)
+
+
+def test_graficar_resultado_invalido():
+    with pytest.raises(ValueError, match="ResultadoArmadura"):
+        Armadura2D.preset_triangulo().graficar(resultado="no")
+
+
+def test_graficar_sin_nudos():
+    with pytest.raises(ValueError, match="nudos"):
+        Armadura2D().graficar()
