@@ -35,7 +35,10 @@ a.graficar(r)
 
 ```powershell
 pytest -v
+python ejemplo_consola.py
 ```
+
+El notebook didáctico (sin Streamlit) está en `examples/notebook_didactico.ipynb`. Use el kernel del `.venv`.
 
 Decisiones de dominio y el plan por fases están en `CONTEXTO_DESARROLLO.md`. La receta de empaquetado está en `ARQUITECTURA_REPLICABLE.md`.
 
