@@ -1,11 +1,16 @@
 """Núcleo del analizador de armaduras 2D isostáticas.
 
-Este módulo no depende de Streamlit ni de Tkinter. El solver, la validación
-completa, los presets y los gráficos se completan en fases posteriores
-(ver ``CONTEXTO_DESARROLLO.md``).
+Este módulo no depende de Streamlit ni de Tkinter. Resuelve el equilibrio
+nodal A x = b con NumPy. Los gráficos van en la fase 4; los presets Warren,
+Pratt y Howe, en la fase 3.
 """
 
+from __future__ import annotations
+
+import math
 from dataclasses import dataclass, field
+
+import numpy as np
 
 __all__ = [
     "Armadura2D",
@@ -21,6 +26,45 @@ def _fase_pendiente(fase, metodo):
         f"{metodo} se implementa en la fase {fase} "
         "(ver CONTEXTO_DESARROLLO.md)."
     )
+
+
+def _entero(valor, nombre):
+    """Exige un entero (admite 0). Rechaza bool y no enteros."""
+    if isinstance(valor, bool) or not isinstance(valor, (int, np.integer)):
+        raise ValueError(
+            f"{nombre} debe ser un entero; se recibió {valor!r}."
+        )
+    return int(valor)
+
+
+def _real(valor, nombre):
+    """Exige un número real. Rechaza bool."""
+    if isinstance(valor, bool) or not isinstance(
+        valor, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(
+            f"{nombre} debe ser un número real; se recibió {valor!r}."
+        )
+    if not math.isfinite(float(valor)):
+        raise ValueError(f"{nombre} debe ser finito; se recibió {valor!r}.")
+    return float(valor)
+
+
+def _id_barra(valor):
+    if not isinstance(valor, str) or not valor.strip():
+        raise ValueError(
+            f"El id de barra debe ser un texto no vacío; se recibió {valor!r}."
+        )
+    return valor
+
+
+def _tipo_apoyo(valor):
+    if valor not in Armadura2D.TIPOS_APOYO:
+        raise ValueError(
+            "El tipo de apoyo debe ser 'fijo' o 'movil'; "
+            f"se recibió {valor!r}."
+        )
+    return valor
 
 
 @dataclass(frozen=True)
@@ -93,7 +137,7 @@ class ChequeoEquilibrio:
     """True si los residuos están bajo la tolerancia."""
 
     residuos_nodos: tuple = field(default_factory=tuple)
-    """Residuos por nudo, si se calculan. Vacío hasta la fase 2."""
+    """Tupla de ``(nudo, res_fx, res_fy)`` ordenada por nudo."""
 
 
 @dataclass(frozen=True)
@@ -122,77 +166,202 @@ class Armadura2D:
         Etiqueta del modelo (por ejemplo el nombre del preset).
     """
 
+    TIPOS_APOYO = ("fijo", "movil")
+    """Apoyos de la 0.1.0: pin (Rx, Ry) y rodillo vertical (Ry)."""
+
+    TOLERANCIA_EQUILIBRIO = 1e-8
+    """Tolerancia absoluta de residuos (kN y kN·m)."""
+
+    EPS_FUERZA_NULA = 1e-8
+    """Umbral |N| para clasificar una barra como ``nula``."""
+
     def __init__(self, nombre="armadura"):
         self._nombre = str(nombre)
         self._nodos = {}
         self._barras = {}
         self._apoyos = {}
         self._cargas = {}
+        self._base_ref = None
+        self._altura_ref = None
 
     @property
     def nombre(self):
         """Etiqueta del modelo (solo lectura)."""
         return self._nombre
 
-    def agregar_nodo(self, id, x, y):
+    def agregar_nodo(self, nudo, x, y):
         """Agrega un nudo con coordenadas en m.
 
+        Parameters
+        ----------
+        nudo : int
+            Identificador entero (puede ser 0).
+        x, y : float
+            Coordenadas en m.
+
         Raises
         ------
-        NotImplementedError
-            Hasta la fase 2.
+        ValueError
+            Si el id no es entero, las coordenadas no son reales o el nudo
+            ya existe.
         """
-        _fase_pendiente(2, "agregar_nodo")
+        nudo = _entero(nudo, "nudo")
+        x = _real(x, "x")
+        y = _real(y, "y")
+        if nudo in self._nodos:
+            raise ValueError(f"El nudo {nudo} ya existe.")
+        self._nodos[nudo] = (x, y)
 
-    def agregar_barra(self, id, nudo_i, nudo_j):
+    def agregar_barra(self, barra, nudo_i, nudo_j):
         """Agrega una barra entre dos nudos existentes.
 
+        Parameters
+        ----------
+        barra : str
+            Identificador de la barra (p. ej. ``"B1"``).
+        nudo_i, nudo_j : int
+            Nudos que une.
+
         Raises
         ------
-        NotImplementedError
-            Hasta la fase 2.
+        ValueError
+            Barra repetida, nudos iguales o inexistentes, o longitud nula.
         """
-        _fase_pendiente(2, "agregar_barra")
+        barra = _id_barra(barra)
+        nudo_i = self._exigir_nudo(nudo_i, "nudo_i")
+        nudo_j = self._exigir_nudo(nudo_j, "nudo_j")
+        if nudo_i == nudo_j:
+            raise ValueError(
+                f"La barra {barra!r} no puede unir un nudo consigo mismo."
+            )
+        if barra in self._barras:
+            raise ValueError(f"La barra {barra!r} ya existe.")
+        par = frozenset((nudo_i, nudo_j))
+        for existente, (i, j) in self._barras.items():
+            if frozenset((i, j)) == par:
+                raise ValueError(
+                    f"Ya existe la barra {existente!r} entre los nudos "
+                    f"{nudo_i} y {nudo_j}."
+                )
+        if self._longitud_entre(nudo_i, nudo_j) == 0.0:
+            raise ValueError(
+                f"La barra {barra!r} tiene longitud 0 "
+                f"(nudos {nudo_i} y {nudo_j} coinciden)."
+            )
+        self._barras[barra] = (nudo_i, nudo_j)
 
     def agregar_apoyo(self, nudo, tipo):
         """Agrega un apoyo ``fijo`` o ``movil`` (rodillo vertical) en un nudo.
 
+        Parameters
+        ----------
+        nudo : int
+        tipo : {"fijo", "movil"}
+
         Raises
         ------
-        NotImplementedError
-            Hasta la fase 2.
+        ValueError
+            Nudo inexistente, tipo ilegal o apoyo ya definido en ese nudo.
         """
-        _fase_pendiente(2, "agregar_apoyo")
+        nudo = self._exigir_nudo(nudo, "nudo")
+        tipo = _tipo_apoyo(tipo)
+        if nudo in self._apoyos:
+            raise ValueError(f"El nudo {nudo} ya tiene un apoyo.")
+        self._apoyos[nudo] = tipo
 
     def agregar_carga(self, nudo, fx=0.0, fy=0.0):
         """Agrega una carga nodal en kN (ejes matemáticos: fy > 0 hacia arriba).
 
         Raises
         ------
-        NotImplementedError
-            Hasta la fase 2.
+        ValueError
+            Nudo inexistente, componentes no reales, o el nudo ya tenía carga.
         """
-        _fase_pendiente(2, "agregar_carga")
+        nudo = self._exigir_nudo(nudo, "nudo")
+        fx = _real(fx, "fx")
+        fy = _real(fy, "fy")
+        if nudo in self._cargas:
+            raise ValueError(
+                f"El nudo {nudo} ya tiene una carga; use reemplazar_carga."
+            )
+        self._cargas[nudo] = (fx, fy)
 
-    def longitud(self, barra_id):
-        """Longitud de una barra en m.
+    def reemplazar_carga(self, nudo, fx=0.0, fy=0.0):
+        """Sustituye (o crea) la carga nodal en kN."""
+        nudo = self._exigir_nudo(nudo, "nudo")
+        self._cargas[nudo] = (_real(fx, "fx"), _real(fy, "fy"))
+
+    def mover_nodo(self, nudo, x, y):
+        """Cambia las coordenadas de un nudo (m).
 
         Raises
         ------
-        NotImplementedError
-            Hasta la fase 2.
+        ValueError
+            Nudo inexistente o alguna barra quedaría con longitud 0.
         """
-        _fase_pendiente(2, "longitud")
+        nudo = self._exigir_nudo(nudo, "nudo")
+        x = _real(x, "x")
+        y = _real(y, "y")
+        anterior = self._nodos[nudo]
+        self._nodos[nudo] = (x, y)
+        try:
+            for barra, (i, j) in self._barras.items():
+                if self._longitud_entre(i, j) == 0.0:
+                    raise ValueError(
+                        f"Mover el nudo {nudo} deja la barra {barra!r} "
+                        "con longitud 0."
+                    )
+        except ValueError:
+            self._nodos[nudo] = anterior
+            raise
 
-    def angulo(self, barra_id):
-        """Ángulo de una barra en radianes (i → j).
+    def escalar(self, factor_x, factor_y):
+        """Escala las coordenadas desde el origen.
 
-        Raises
-        ------
-        NotImplementedError
-            Hasta la fase 2.
+        Parameters
+        ----------
+        factor_x, factor_y : float
+            Multiplicadores de x e y. Deben ser finitos y no nulos.
         """
-        _fase_pendiente(2, "angulo")
+        factor_x = _real(factor_x, "factor_x")
+        factor_y = _real(factor_y, "factor_y")
+        if factor_x == 0.0 or factor_y == 0.0:
+            raise ValueError("Los factores de escala no pueden ser 0.")
+        anterior = dict(self._nodos)
+        self._nodos = {
+            nudo: (x * factor_x, y * factor_y)
+            for nudo, (x, y) in self._nodos.items()
+        }
+        try:
+            for barra, (i, j) in self._barras.items():
+                if self._longitud_entre(i, j) == 0.0:
+                    raise ValueError(
+                        f"La escala deja la barra {barra!r} con longitud 0."
+                    )
+        except ValueError:
+            self._nodos = anterior
+            raise
+
+    def definir_apoyos(self, nudo_fijo, nudo_movil):
+        """Deja exactamente un apoyo fijo y un móvil en nudos existentes."""
+        nudo_fijo = self._exigir_nudo(nudo_fijo, "nudo_fijo")
+        nudo_movil = self._exigir_nudo(nudo_movil, "nudo_movil")
+        if nudo_fijo == nudo_movil:
+            raise ValueError(
+                "El apoyo fijo y el móvil deben estar en nudos distintos."
+            )
+        self._apoyos = {nudo_fijo: "fijo", nudo_movil: "movil"}
+
+    def longitud(self, barra):
+        """Longitud de una barra en m."""
+        i, j = self._barra(barra)
+        return self._longitud_entre(i, j)
+
+    def angulo(self, barra):
+        """Ángulo de una barra en radianes (i → j)."""
+        i, j = self._barra(barra)
+        dx, dy = self._delta(i, j)
+        return math.atan2(dy, dx)
 
     def resolver(self):
         """Resuelve A x = b y clasifica tensión/compresión.
@@ -203,20 +372,110 @@ class Armadura2D:
 
         Raises
         ------
-        NotImplementedError
-            Hasta la fase 2.
+        ValueError
+            Si la armadura no es isostática o el sistema es singular.
         """
-        _fase_pendiente(2, "resolver")
+        j = len(self._nodos)
+        m = len(self._barras)
+        r = self._n_reacciones()
+        if j == 0:
+            raise ValueError("La armadura no tiene nudos.")
+        if m + r > 2 * j:
+            raise ValueError(
+                "La armadura es hiperestática (m + r > 2j); "
+                "este paquete solo resuelve isostáticas."
+            )
+        if m + r < 2 * j:
+            raise ValueError(
+                "La armadura es hipostática (m + r < 2j); "
+                "faltan barras o reacciones."
+            )
+
+        nudos = sorted(self._nodos)
+        fila = {nudo: 2 * k for k, nudo in enumerate(nudos)}
+        barras = list(self._barras.items())
+        n = 2 * j
+        a_mat = np.zeros((n, n), dtype=float)
+        b_vec = np.zeros(n, dtype=float)
+
+        for nudo in nudos:
+            fx, fy = self._carga(nudo)
+            b_vec[fila[nudo]] = -fx
+            b_vec[fila[nudo] + 1] = -fy
+
+        for col, (_barra, (nudo_i, nudo_j)) in enumerate(barras):
+            ux, uy = self._unitario(nudo_i, nudo_j)
+            a_mat[fila[nudo_i], col] += ux
+            a_mat[fila[nudo_i] + 1, col] += uy
+            a_mat[fila[nudo_j], col] += -ux
+            a_mat[fila[nudo_j] + 1, col] += -uy
+
+        col = m
+        gdl_reaccion = []
+        for nudo in sorted(self._apoyos):
+            tipo = self._apoyos[nudo]
+            if tipo == "fijo":
+                a_mat[fila[nudo], col] = 1.0
+                gdl_reaccion.append((nudo, "rx", col))
+                col += 1
+                a_mat[fila[nudo] + 1, col] = 1.0
+                gdl_reaccion.append((nudo, "ry", col))
+                col += 1
+            else:
+                a_mat[fila[nudo] + 1, col] = 1.0
+                gdl_reaccion.append((nudo, "ry", col))
+                col += 1
+
+        try:
+            x = np.linalg.solve(a_mat, b_vec)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "El sistema de equilibrio es singular "
+                "(geometría degenerada o apoyos mal colocados)."
+            ) from exc
+
+        fuerzas = []
+        for col, (barra, (nudo_i, nudo_j)) in enumerate(barras):
+            fuerzas.append(self._fuerza_barra(barra, nudo_i, nudo_j, float(x[col])))
+
+        rx_ry = {nudo: [0.0, 0.0] for nudo in self._apoyos}
+        for nudo, gdl, col in gdl_reaccion:
+            if gdl == "rx":
+                rx_ry[nudo][0] = float(x[col])
+            else:
+                rx_ry[nudo][1] = float(x[col])
+        reacciones = tuple(
+            Reaccion(nudo=nudo, rx=rx_ry[nudo][0], ry=rx_ry[nudo][1])
+            for nudo in sorted(self._apoyos)
+        )
+        fuerzas = tuple(fuerzas)
+        equilibrio = self._chequear(fuerzas, reacciones)
+        return ResultadoArmadura(
+            fuerzas=fuerzas,
+            reacciones=reacciones,
+            equilibrio=equilibrio,
+        )
 
     def verificar_equilibrio(self, resultado=None):
         """Comprueba residuos de ΣFx, ΣFy y ΣM.
 
-        Raises
-        ------
-        NotImplementedError
-            Hasta la fase 2.
+        Parameters
+        ----------
+        resultado : ResultadoArmadura, optional
+            Si se omite, se llama a ``resolver()``.
+
+        Returns
+        -------
+        ChequeoEquilibrio
         """
-        _fase_pendiente(2, "verificar_equilibrio")
+        if resultado is None:
+            return self.resolver().equilibrio
+        if not isinstance(resultado, ResultadoArmadura):
+            raise ValueError(
+                "resultado debe ser un ResultadoArmadura; "
+                f"se recibió {type(resultado)!r}."
+            )
+        return self._chequear(resultado.fuerzas, resultado.reacciones)
 
     def graficar(self, resultado=None):
         """Devuelve una ``matplotlib.figure.Figure`` de la armadura.
@@ -230,8 +489,20 @@ class Armadura2D:
 
     @classmethod
     def preset_triangulo(cls):
-        """Preset del triángulo isósceles de libro (fase 2)."""
-        _fase_pendiente(2, "preset_triangulo")
+        """Triángulo isósceles de libro: 4 m × 3 m, 50 kN en la cúspide."""
+        armadura = cls(nombre="Triángulo")
+        armadura.agregar_nodo(0, 0.0, 0.0)
+        armadura.agregar_nodo(1, 4.0, 0.0)
+        armadura.agregar_nodo(2, 2.0, 3.0)
+        armadura.agregar_barra("B1", 0, 1)
+        armadura.agregar_barra("B2", 0, 2)
+        armadura.agregar_barra("B3", 1, 2)
+        armadura.agregar_apoyo(0, "fijo")
+        armadura.agregar_apoyo(1, "movil")
+        armadura.agregar_carga(2, fx=0.0, fy=-50.0)
+        armadura._base_ref = 4.0
+        armadura._altura_ref = 3.0
+        return armadura
 
     @classmethod
     def preset_warren(cls):
@@ -249,4 +520,118 @@ class Armadura2D:
         _fase_pendiente(3, "preset_howe")
 
     def __repr__(self):
-        return f"Armadura2D(nombre={self._nombre!r})"
+        return (
+            f"Armadura2D(nombre={self._nombre!r}, "
+            f"nudos={len(self._nodos)}, barras={len(self._barras)})"
+        )
+
+    def _exigir_nudo(self, nudo, nombre):
+        nudo = _entero(nudo, nombre)
+        if nudo not in self._nodos:
+            raise ValueError(f"No existe el nudo {nudo}.")
+        return nudo
+
+    def _barra(self, barra):
+        barra = _id_barra(barra)
+        if barra not in self._barras:
+            raise ValueError(f"No existe la barra {barra!r}.")
+        return self._barras[barra]
+
+    def _carga(self, nudo):
+        return self._cargas.get(nudo, (0.0, 0.0))
+
+    def _delta(self, nudo_i, nudo_j):
+        x_i, y_i = self._nodos[nudo_i]
+        x_j, y_j = self._nodos[nudo_j]
+        return x_j - x_i, y_j - y_i
+
+    def _longitud_entre(self, nudo_i, nudo_j):
+        dx, dy = self._delta(nudo_i, nudo_j)
+        return math.hypot(dx, dy)
+
+    def _unitario(self, nudo_i, nudo_j):
+        longitud = self._longitud_entre(nudo_i, nudo_j)
+        if longitud == 0.0:
+            raise ValueError(
+                f"Los nudos {nudo_i} y {nudo_j} coinciden (longitud 0)."
+            )
+        dx, dy = self._delta(nudo_i, nudo_j)
+        return dx / longitud, dy / longitud
+
+    def _n_reacciones(self):
+        total = 0
+        for tipo in self._apoyos.values():
+            total += 2 if tipo == "fijo" else 1
+        return total
+
+    def _clasificar(self, fuerza):
+        if fuerza > self.EPS_FUERZA_NULA:
+            return "tension"
+        if fuerza < -self.EPS_FUERZA_NULA:
+            return "compresion"
+        return "nula"
+
+    def _fuerza_barra(self, barra, nudo_i, nudo_j, fuerza):
+        longitud = self._longitud_entre(nudo_i, nudo_j)
+        ux, uy = self._unitario(nudo_i, nudo_j)
+        return FuerzaBarra(
+            id=barra,
+            nudo_i=nudo_i,
+            nudo_j=nudo_j,
+            fuerza=fuerza,
+            tipo=self._clasificar(fuerza),
+            longitud=longitud,
+            angulo=math.atan2(uy, ux) if longitud else 0.0,
+            coseno=ux,
+            seno=uy,
+        )
+
+    def _chequear(self, fuerzas, reacciones):
+        sum_fx = 0.0
+        sum_fy = 0.0
+        sum_mz = 0.0
+        for nudo, (x, y) in self._nodos.items():
+            fx, fy = self._carga(nudo)
+            sum_fx += fx
+            sum_fy += fy
+            sum_mz += x * fy - y * fx
+        mapa_r = {item.nudo: item for item in reacciones}
+        for nudo, item in mapa_r.items():
+            x, y = self._nodos[nudo]
+            sum_fx += item.rx
+            sum_fy += item.ry
+            sum_mz += x * item.ry - y * item.rx
+
+        contrib_x = {nudo: 0.0 for nudo in self._nodos}
+        contrib_y = {nudo: 0.0 for nudo in self._nodos}
+        for barra in fuerzas:
+            ux, uy = barra.coseno, barra.seno
+            contrib_x[barra.nudo_i] += barra.fuerza * ux
+            contrib_y[barra.nudo_i] += barra.fuerza * uy
+            contrib_x[barra.nudo_j] += barra.fuerza * (-ux)
+            contrib_y[barra.nudo_j] += barra.fuerza * (-uy)
+
+        residuos = []
+        for nudo in sorted(self._nodos):
+            fx, fy = self._carga(nudo)
+            rec = mapa_r.get(nudo)
+            rx = rec.rx if rec is not None else 0.0
+            ry = rec.ry if rec is not None else 0.0
+            res_x = contrib_x[nudo] + rx + fx
+            res_y = contrib_y[nudo] + ry + fy
+            residuos.append((nudo, res_x, res_y))
+
+        tol = self.TOLERANCIA_EQUILIBRIO
+        ok = (
+            abs(sum_fx) <= tol
+            and abs(sum_fy) <= tol
+            and abs(sum_mz) <= tol
+            and all(abs(rx) <= tol and abs(ry) <= tol for _, rx, ry in residuos)
+        )
+        return ChequeoEquilibrio(
+            sum_fx=sum_fx,
+            sum_fy=sum_fy,
+            sum_mz=sum_mz,
+            ok=ok,
+            residuos_nodos=tuple(residuos),
+        )

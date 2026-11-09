@@ -1,11 +1,14 @@
 """Analizador de armaduras 2D isostáticas (mecánica vectorial).
 
-Uso rápido (el solver se completa en la fase 2)::
+Uso rápido::
 
     from armadura_2d_andresdperezc import Armadura2D
 
-    a = Armadura2D()
-    print(a)
+    a = Armadura2D.preset_triangulo()
+    r = a.resolver()
+    print(r.equilibrio.ok)
+    for barra in r.fuerzas:
+        print(barra.id, barra.tipo, barra.fuerza)
 """
 
 from .core import (
