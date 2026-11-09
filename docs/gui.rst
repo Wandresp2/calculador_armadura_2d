@@ -45,5 +45,5 @@ Usar en cualquier PC::
 
 Luego http://localhost:8501.
 
-El ``Dockerfile`` (fase 8) hará escuchar a Streamlit en ``0.0.0.0:8501``.
+El ``Dockerfile`` hace escuchar a Streamlit en ``0.0.0.0:8501``.
 GitHub Pages hospeda **solo** este HTML estático, no la GUI.
