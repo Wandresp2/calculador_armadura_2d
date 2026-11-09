@@ -166,7 +166,7 @@ class Armadura2D:
     """Tolerancia absoluta de residuos (kN y kN·m)."""
 
     EPS_FUERZA_NULA = 1e-8
-    """Umbral |N| para clasificar una barra como ``nula``."""
+    """Umbral del valor absoluto de N para clasificar una barra como ``nula``."""
 
     COLOR_TENSION = "#1A6B7A"
     """Teal: barra a tracción (como en el PPT del curso)."""
@@ -208,26 +208,50 @@ class Armadura2D:
         return self._altura_ref
 
     def snapshot_nodos(self):
-        """Copia de nudos: ``((id, x, y), ...)`` ordenada por id."""
+        """Copia de nudos para la GUI y scripts (no expone ``_nodos``).
+
+        Returns
+        -------
+        tuple of tuple
+            ``(id, x, y)`` ordenados por id.
+        """
         return tuple(
             (nudo, xy[0], xy[1]) for nudo, xy in sorted(self._nodos.items())
         )
 
     def snapshot_barras(self):
-        """Copia de barras: ``((id, nudo_i, nudo_j), ...)`` en orden de alta."""
+        """Copia de barras en el orden en que se agregaron.
+
+        Returns
+        -------
+        tuple of tuple
+            ``(id, nudo_i, nudo_j)``.
+        """
         return tuple(
             (barra, nudo_i, nudo_j)
             for barra, (nudo_i, nudo_j) in self._barras.items()
         )
 
     def snapshot_apoyos(self):
-        """Copia de apoyos: ``((nudo, tipo), ...)``."""
+        """Copia de apoyos.
+
+        Returns
+        -------
+        tuple of tuple
+            ``(nudo, tipo)`` con ``tipo`` igual a ``"fijo"`` o ``"movil"``.
+        """
         return tuple(
             (nudo, tipo) for nudo, tipo in sorted(self._apoyos.items())
         )
 
     def snapshot_cargas(self):
-        """Copia de cargas: ``((nudo, fx, fy), ...)``."""
+        """Copia de cargas nodales en ejes del modelo (fy > 0 hacia arriba).
+
+        Returns
+        -------
+        tuple of tuple
+            ``(nudo, fx, fy)`` en kN.
+        """
         return tuple(
             (nudo, fx, fy)
             for nudo, (fx, fy) in sorted(self._cargas.items())
@@ -316,6 +340,12 @@ class Armadura2D:
     def agregar_carga(self, nudo, fx=0.0, fy=0.0):
         """Agrega una carga nodal en kN (ejes matemáticos: fy > 0 hacia arriba).
 
+        Parameters
+        ----------
+        nudo : int
+        fx, fy : float, optional
+            Componentes en kN. En la GUI, “hacia abajo (+)” se convierte a fy negativa.
+
         Raises
         ------
         ValueError
@@ -331,7 +361,13 @@ class Armadura2D:
         self._cargas[nudo] = (fx, fy)
 
     def reemplazar_carga(self, nudo, fx=0.0, fy=0.0):
-        """Sustituye (o crea) la carga nodal en kN."""
+        """Sustituye (o crea) la carga nodal en kN.
+
+        Parameters
+        ----------
+        nudo : int
+        fx, fy : float, optional
+        """
         nudo = self._exigir_nudo(nudo, "nudo")
         self._cargas[nudo] = (_real(fx, "fx"), _real(fy, "fy"))
 
@@ -387,7 +423,18 @@ class Armadura2D:
             raise
 
     def definir_apoyos(self, nudo_fijo, nudo_movil):
-        """Deja exactamente un apoyo fijo y un móvil en nudos existentes."""
+        """Deja exactamente un apoyo fijo y un móvil en nudos existentes.
+
+        Parameters
+        ----------
+        nudo_fijo, nudo_movil : int
+            Deben ser nudos distintos. El fijo aporta Rx y Ry; el móvil, Ry.
+
+        Raises
+        ------
+        ValueError
+            Nudo inexistente o ambos ids iguales.
+        """
         nudo_fijo = self._exigir_nudo(nudo_fijo, "nudo_fijo")
         nudo_movil = self._exigir_nudo(nudo_movil, "nudo_movil")
         if nudo_fijo == nudo_movil:
@@ -451,12 +498,30 @@ class Armadura2D:
             raise
 
     def longitud(self, barra):
-        """Longitud de una barra en m."""
+        """Longitud de una barra en m.
+
+        Parameters
+        ----------
+        barra : str
+
+        Returns
+        -------
+        float
+        """
         i, j = self._barra(barra)
         return self._longitud_entre(i, j)
 
     def angulo(self, barra):
-        """Ángulo de una barra en radianes (i → j)."""
+        """Ángulo de una barra en radianes (i → j).
+
+        Parameters
+        ----------
+        barra : str
+
+        Returns
+        -------
+        float
+        """
         i, j = self._barra(barra)
         dx, dy = self._delta(i, j)
         return math.atan2(dy, dx)
@@ -820,7 +885,13 @@ class Armadura2D:
 
     @classmethod
     def preset_triangulo(cls):
-        """Triángulo isósceles de libro: 4 m × 3 m, 50 kN en la cúspide."""
+        """Triángulo isósceles de libro: 4 m × 3 m, 50 kN en la cúspide.
+
+        Returns
+        -------
+        Armadura2D
+            Fijo en 0, móvil en 1, :math:`F_y = -50` kN en el nudo 2.
+        """
         armadura = cls(nombre="Triángulo")
         armadura.agregar_nodo(0, 0.0, 0.0)
         armadura.agregar_nodo(1, 4.0, 0.0)
@@ -837,7 +908,12 @@ class Armadura2D:
 
     @classmethod
     def preset_warren(cls):
-        """Puente Warren de 2 paneles: 4 m × 2 m, 50 kN en el tablero central."""
+        """Puente Warren de 2 paneles: 4 m × 2 m, 50 kN en el tablero central.
+
+        Returns
+        -------
+        Armadura2D
+        """
         armadura = cls._puente_base(
             nombre="Warren",
             nudos=(
@@ -862,7 +938,13 @@ class Armadura2D:
 
     @classmethod
     def preset_pratt(cls):
-        """Puente Pratt de 2 paneles: diagonales hacia el centro."""
+        """Puente Pratt de 2 paneles: diagonales hacia el centro (a tracción).
+
+        Returns
+        -------
+        Armadura2D
+            Diagonales ``3-1`` y ``5-1``.
+        """
         armadura = cls._cordones_pratt_howe(nombre="Pratt")
         armadura.agregar_barra("B8", 3, 1)
         armadura.agregar_barra("B9", 5, 1)
@@ -870,7 +952,13 @@ class Armadura2D:
 
     @classmethod
     def preset_howe(cls):
-        """Puente Howe de 2 paneles: diagonales hacia los apoyos."""
+        """Puente Howe de 2 paneles: diagonales hacia los apoyos (a compresión).
+
+        Returns
+        -------
+        Armadura2D
+            Diagonales ``4-0`` y ``4-2``.
+        """
         armadura = cls._cordones_pratt_howe(nombre="Howe")
         armadura.agregar_barra("B8", 4, 0)
         armadura.agregar_barra("B9", 4, 2)
