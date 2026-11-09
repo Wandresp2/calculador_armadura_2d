@@ -1,8 +1,7 @@
 """Núcleo del analizador de armaduras 2D isostáticas.
 
 Este módulo no depende de Streamlit ni de Tkinter. Resuelve el equilibrio
-nodal A x = b con NumPy. Los gráficos van en la fase 4; los presets Warren,
-Pratt y Howe, en la fase 3.
+nodal A x = b con NumPy. Los gráficos van en la fase 4.
 """
 
 from __future__ import annotations
@@ -506,18 +505,83 @@ class Armadura2D:
 
     @classmethod
     def preset_warren(cls):
-        """Preset Warren de 2 paneles (fase 3)."""
-        _fase_pendiente(3, "preset_warren")
+        """Puente Warren de 2 paneles: 4 m × 2 m, 50 kN en el tablero central."""
+        armadura = cls._puente_base(
+            nombre="Warren",
+            nudos=(
+                (0, 0.0, 0.0),
+                (1, 2.0, 0.0),
+                (2, 4.0, 0.0),
+                (3, 1.0, 2.0),
+                (4, 3.0, 2.0),
+            ),
+        )
+        for barra, nudo_i, nudo_j in (
+            ("B1", 0, 1),
+            ("B2", 1, 2),
+            ("B3", 3, 4),
+            ("B4", 0, 3),
+            ("B5", 2, 4),
+            ("B6", 3, 1),
+            ("B7", 1, 4),
+        ):
+            armadura.agregar_barra(barra, nudo_i, nudo_j)
+        return armadura
 
     @classmethod
     def preset_pratt(cls):
-        """Preset Pratt de 2 paneles (fase 3)."""
-        _fase_pendiente(3, "preset_pratt")
+        """Puente Pratt de 2 paneles: diagonales hacia el centro."""
+        armadura = cls._cordones_pratt_howe(nombre="Pratt")
+        armadura.agregar_barra("B8", 3, 1)
+        armadura.agregar_barra("B9", 5, 1)
+        return armadura
 
     @classmethod
     def preset_howe(cls):
-        """Preset Howe de 2 paneles (fase 3)."""
-        _fase_pendiente(3, "preset_howe")
+        """Puente Howe de 2 paneles: diagonales hacia los apoyos."""
+        armadura = cls._cordones_pratt_howe(nombre="Howe")
+        armadura.agregar_barra("B8", 4, 0)
+        armadura.agregar_barra("B9", 4, 2)
+        return armadura
+
+    @classmethod
+    def _puente_base(cls, nombre, nudos):
+        """Nudos, apoyos y carga comunes de Warren / Pratt / Howe."""
+        armadura = cls(nombre=nombre)
+        for nudo, x, y in nudos:
+            armadura.agregar_nodo(nudo, x, y)
+        armadura.agregar_apoyo(0, "fijo")
+        armadura.agregar_apoyo(2, "movil")
+        armadura.agregar_carga(1, fx=0.0, fy=-50.0)
+        armadura._base_ref = 4.0
+        armadura._altura_ref = 2.0
+        return armadura
+
+    @classmethod
+    def _cordones_pratt_howe(cls, nombre):
+        """Misma geometría de 6 nudos, cuerdas y verticales; cambian las diagonales."""
+        armadura = cls._puente_base(
+            nombre=nombre,
+            nudos=(
+                (0, 0.0, 0.0),
+                (1, 2.0, 0.0),
+                (2, 4.0, 0.0),
+                (3, 0.0, 2.0),
+                (4, 2.0, 2.0),
+                (5, 4.0, 2.0),
+            ),
+        )
+        for barra, nudo_i, nudo_j in (
+            ("B1", 0, 1),
+            ("B2", 1, 2),
+            ("B3", 3, 4),
+            ("B4", 4, 5),
+            ("B5", 0, 3),
+            ("B6", 1, 4),
+            ("B7", 2, 5),
+        ):
+            armadura.agregar_barra(barra, nudo_i, nudo_j)
+        return armadura
 
     def __repr__(self):
         return (

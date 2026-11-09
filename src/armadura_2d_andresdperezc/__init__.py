@@ -4,7 +4,7 @@ Uso rápido::
 
     from armadura_2d_andresdperezc import Armadura2D
 
-    a = Armadura2D.preset_triangulo()
+    a = Armadura2D.preset_triangulo()  # también preset_warren, preset_pratt, preset_howe
     r = a.resolver()
     print(r.equilibrio.ok)
     for barra in r.fuerzas:

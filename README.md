@@ -11,7 +11,7 @@ from armadura_2d_andresdperezc import Armadura2D
 
 Versión **0.1.0**. Python **≥ 3.10**. Licencia **MIT**.
 
-La GUI de Streamlit **no** forma parte del paquete (llegará en una fase posterior, fuera de `src/`). En esta versión el preset **Triángulo** ya se resuelve; Warren, Pratt, Howe y los gráficos siguen pendientes.
+La GUI de Streamlit **no** forma parte del paquete (llegará en una fase posterior, fuera de `src/`). Los cuatro presets (**Triángulo**, **Warren**, **Pratt**, **Howe**) ya se resuelven; los gráficos siguen pendientes.
 
 ## Instalación de desarrollo
 

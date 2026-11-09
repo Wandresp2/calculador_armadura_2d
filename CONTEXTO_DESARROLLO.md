@@ -4,7 +4,7 @@
 
 Léelo junto con `ARQUITECTURA_REPLICABLE.md` (receta de empaquetado copiada de Bohr: `src/`, PyPI, Sphinx, Streamlit, Docker **sin EC2**). No copies física de Bohr ni secciones de EC2.
 
-**Estado:** diseño cerrado. Fases 0 a 2 hechas. Fases 3 a 10 pendientes.
+**Estado:** diseño cerrado. Fases 0 a 3 hechas. Fases 4 a 10 pendientes.
 
 **Autor del paquete:** Andrés David Pérez Criollo  
 **Correo:** adperezc@udistrital.edu.co  
@@ -596,7 +596,7 @@ Trabajar **una fase por vez**. Al cerrar: actualizar esta tabla.
 | 0 | Contexto | **Hecha** | Este archivo | Decisiones, mecánica, presets, API, limitaciones, futuro y fases escritos |
 | 1 | Esqueleto instalable | **Hecha** | `pyproject.toml`, `LICENSE`, `.gitignore`, `src/.../__init__.py`, `core.py` mínimo, README corto | `pip install -e .` e `import armadura_2d_andresdperezc` |
 | 2 | Dominio + tests triángulo | **Hecha** | Construcción, \(A x = b\), T/C, reacciones, `verificar_equilibrio`, validaciones, tests de libro | `pytest -v` verde con la tabla 5.1 |
-| 3 | Presets Warren / Pratt / Howe | Pendiente | `preset_*`, tests de isostática, residuos ≈ 0, signos Pratt vs Howe | Los cuatro presets `resolver()` sin GUI |
+| 3 | Presets Warren / Pratt / Howe | **Hecha** | `preset_*`, tests de isostática, residuos ≈ 0, signos Pratt vs Howe | Los cuatro presets `resolver()` sin GUI |
 | 4 | Gráficos | Pendiente | `graficar()` + test de `Figure` | Figura sin Streamlit |
 | 5 | Ejemplos | Pendiente | `ejemplo_consola.py` + `examples/notebook_didactico.ipynb` | Uso sin GUI |
 | 6 | Streamlit | Pendiente | Selector, sliders, tablas, conversión de carga “abajo +”, residuos, figura | `streamlit run streamlit_app.py` |
@@ -630,7 +630,16 @@ python -m pip install -e ".[dev]"
 pytest -v
 ```
 
-21 tests en verde: reacciones 25 kN, B1 \(=+50/3\) kN (tensión), B2 y B3 \(=-(25/3)\sqrt{13}\) kN (compresión), residuos ≈ 0, `ValueError` en casos ilegales. `preset_warren` / `pratt` / `howe` y `graficar` siguen en `NotImplementedError`.
+21 tests en verde (fase 2): reacciones 25 kN, B1 \(=+50/3\) kN (tensión), B2 y B3 \(=-(25/3)\sqrt{13}\) kN (compresión), residuos ≈ 0, `ValueError` en casos ilegales.
+
+### Cómo verificar la fase 3
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pytest -v
+```
+
+28 tests en verde. Los cuatro presets resuelven; Pratt: diagonales `3-1` y `5-1` a tracción; Howe: `4-0` y `4-2` a compresión. `graficar` sigue en `NotImplementedError`.
 
 ---
 
@@ -664,7 +673,7 @@ pytest -v
 - [x] `Armadura2D` + dataclasses de resultado (API definida; solver en fase 2)
 - [x] Validaciones `ValueError` (nudo, barra, apoyos, isostática, sistema singular)
 - [x] Docstrings NumPy/Google en la API de fase 2
-- [x] `pytest -v` en verde (triángulo de libro + errores; Warren/Pratt/Howe en fase 3)
+- [x] `pytest -v` en verde (triángulo de libro + Warren/Pratt/Howe + errores)
 - [ ] GUI no duplica lógica
 
 ### GUI / Docker
@@ -696,14 +705,15 @@ pytest -v
 7. Futuro escrito: dibujar cualquier armadura; esfuerzo/diámetro.
 8. Fase 0 = este archivo.
 9. Fase 1 = esqueleto instalable (`pip install -e .`, import `Armadura2D`).
-10. Fase 2 = `A x = b`, T/C, `preset_triangulo`, `tests/test_core.py` (21 tests). Warren/Pratt/Howe y `graficar` pendientes.
+10. Fase 2 = `A x = b`, T/C, `preset_triangulo`, tests de libro.
+11. Fase 3 = `preset_warren`, `preset_pratt`, `preset_howe` (28 tests). `graficar` pendiente.
 
 ---
 
-## 18. Pendiente del usuario (no bloquea la fase 3)
+## 18. Pendiente del usuario (no bloquea la fase 4)
 
 - Crear el repositorio GitHub y pasar la URL.
 - El día de publicar, confirmar que `armadura-2d-andresdperezc` sigue libre en PyPI.
 - Subidas: TestPyPI, PyPI, Docker Hub, Pages.
 
-Siguiente implementación cuando el usuario la pida: **fase 3** (presets Warren, Pratt y Howe).
+Siguiente implementación cuando el usuario la pida: **fase 4** (`graficar()`).

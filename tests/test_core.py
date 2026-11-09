@@ -180,3 +180,56 @@ def test_definir_apoyos_invierte_extremos():
     assert rec[1].ry == pytest.approx(25.0)
     assert rec[0].ry == pytest.approx(25.0)
     assert rec[0].rx == pytest.approx(0.0)
+
+
+def _barra_entre(resultado, nudo_i, nudo_j):
+    par = frozenset((nudo_i, nudo_j))
+    for barra in resultado.fuerzas:
+        if frozenset((barra.nudo_i, barra.nudo_j)) == par:
+            return barra
+    raise AssertionError(f"No hay barra entre {nudo_i} y {nudo_j}.")
+
+
+PRESETS_ISOSTATICOS = [
+    (Armadura2D.preset_triangulo, 3, 3),
+    (Armadura2D.preset_warren, 5, 7),
+    (Armadura2D.preset_pratt, 6, 9),
+    (Armadura2D.preset_howe, 6, 9),
+]
+
+
+@pytest.mark.parametrize("factory, nudos, barras", PRESETS_ISOSTATICOS)
+def test_presets_isostaticos_y_equilibrio(factory, nudos, barras):
+    armadura = factory()
+    resultado = armadura.resolver()
+    assert resultado.equilibrio.ok
+    assert len(resultado.fuerzas) == barras
+    assert len(resultado.equilibrio.residuos_nodos) == nudos
+    assert barras + 3 == 2 * nudos
+    rec = _reacciones(resultado)
+    assert rec[0].ry + rec[2 if nudos > 3 else 1].ry == pytest.approx(50.0)
+    for _nudo, res_x, res_y in resultado.equilibrio.residuos_nodos:
+        assert res_x == pytest.approx(0.0, abs=1e-8)
+        assert res_y == pytest.approx(0.0, abs=1e-8)
+
+
+def test_pratt_diagonales_a_traccion():
+    resultado = Armadura2D.preset_pratt().resolver()
+    for nudo_i, nudo_j in ((3, 1), (5, 1)):
+        barra = _barra_entre(resultado, nudo_i, nudo_j)
+        assert barra.tipo == "tension"
+        assert barra.fuerza > 0
+
+
+def test_howe_diagonales_a_compresion():
+    resultado = Armadura2D.preset_howe().resolver()
+    for nudo_i, nudo_j in ((4, 0), (4, 2)):
+        barra = _barra_entre(resultado, nudo_i, nudo_j)
+        assert barra.tipo == "compresion"
+        assert barra.fuerza < 0
+
+
+def test_warren_resuelve_sin_gui():
+    resultado = Armadura2D.preset_warren().resolver()
+    assert len(resultado.fuerzas) == 7
+    assert resultado.equilibrio.ok
