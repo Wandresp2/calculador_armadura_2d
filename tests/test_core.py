@@ -283,3 +283,23 @@ def test_graficar_resultado_invalido():
 def test_graficar_sin_nudos():
     with pytest.raises(ValueError, match="nudos"):
         Armadura2D().graficar()
+
+
+def test_snapshot_y_reemplazar_coordenadas():
+    armadura = Armadura2D.preset_triangulo()
+    nudos = armadura.snapshot_nodos()
+    assert nudos[0] == (0, 0.0, 0.0)
+    assert ("B1", 0, 1) in armadura.snapshot_barras()
+    armadura.reemplazar_coordenadas({0: (0.0, 0.0), 1: (8.0, 0.0), 2: (4.0, 6.0)})
+    assert armadura.longitud("B1") == pytest.approx(8.0)
+    resultado = armadura.resolver()
+    assert resultado.equilibrio.ok
+    with pytest.raises(ValueError, match="exactamente"):
+        armadura.reemplazar_coordenadas({0: (0.0, 0.0)})
+
+
+def test_definir_cargas_sustituye_conjunto():
+    armadura = Armadura2D.preset_triangulo()
+    armadura.definir_cargas([(2, 0.0, -20.0)])
+    rec = _reacciones(armadura.resolver())
+    assert rec[0].ry == pytest.approx(10.0)

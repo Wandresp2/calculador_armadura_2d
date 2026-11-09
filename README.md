@@ -11,7 +11,7 @@ from armadura_2d_andresdperezc import Armadura2D
 
 Versión **0.1.0**. Python **≥ 3.10**. Licencia **MIT**.
 
-La GUI de Streamlit **no** forma parte del paquete (llegará en una fase posterior, fuera de `src/`). Los cuatro presets (**Triángulo**, **Warren**, **Pratt**, **Howe**) se resuelven y `graficar()` devuelve una figura matplotlib (tensión/compresión).
+La GUI de Streamlit **no** forma parte del paquete PyPI: vive en este repositorio (`streamlit_app.py`). Los cuatro presets (**Triángulo**, **Warren**, **Pratt**, **Howe**) se resuelven y `graficar()` devuelve una figura matplotlib (tensión/compresión).
 
 ## Instalación de desarrollo
 
@@ -19,7 +19,7 @@ La GUI de Streamlit **no** forma parte del paquete (llegará en una fase posteri
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[gui,dev]"
 ```
 
 ```python
@@ -36,6 +36,7 @@ a.graficar(r)
 ```powershell
 pytest -v
 python ejemplo_consola.py
+streamlit run streamlit_app.py
 ```
 
 El notebook didáctico (sin Streamlit) está en `examples/notebook_didactico.ipynb`. Use el kernel del `.venv`.

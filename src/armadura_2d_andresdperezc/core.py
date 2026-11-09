@@ -197,6 +197,42 @@ class Armadura2D:
         """Etiqueta del modelo (solo lectura)."""
         return self._nombre
 
+    @property
+    def base_ref(self):
+        """Base del preset en m, o ``None`` si no es un preset."""
+        return self._base_ref
+
+    @property
+    def altura_ref(self):
+        """Altura del preset en m, o ``None`` si no es un preset."""
+        return self._altura_ref
+
+    def snapshot_nodos(self):
+        """Copia de nudos: ``((id, x, y), ...)`` ordenada por id."""
+        return tuple(
+            (nudo, xy[0], xy[1]) for nudo, xy in sorted(self._nodos.items())
+        )
+
+    def snapshot_barras(self):
+        """Copia de barras: ``((id, nudo_i, nudo_j), ...)`` en orden de alta."""
+        return tuple(
+            (barra, nudo_i, nudo_j)
+            for barra, (nudo_i, nudo_j) in self._barras.items()
+        )
+
+    def snapshot_apoyos(self):
+        """Copia de apoyos: ``((nudo, tipo), ...)``."""
+        return tuple(
+            (nudo, tipo) for nudo, tipo in sorted(self._apoyos.items())
+        )
+
+    def snapshot_cargas(self):
+        """Copia de cargas: ``((nudo, fx, fy), ...)``."""
+        return tuple(
+            (nudo, fx, fy)
+            for nudo, (fx, fy) in sorted(self._cargas.items())
+        )
+
     def agregar_nodo(self, nudo, x, y):
         """Agrega un nudo con coordenadas en m.
 
@@ -359,6 +395,60 @@ class Armadura2D:
                 "El apoyo fijo y el móvil deben estar en nudos distintos."
             )
         self._apoyos = {nudo_fijo: "fijo", nudo_movil: "movil"}
+
+    def definir_cargas(self, cargas):
+        """Sustituye el conjunto de cargas nodales.
+
+        Parameters
+        ----------
+        cargas : iterable
+            Triplets ``(nudo, fx, fy)`` en kN (fy > 0 hacia arriba).
+        """
+        nuevo = {}
+        for nudo, fx, fy in cargas:
+            nudo = self._exigir_nudo(nudo, "nudo")
+            nuevo[nudo] = (_real(fx, "fx"), _real(fy, "fy"))
+        self._cargas = nuevo
+
+    def reemplazar_coordenadas(self, coordenadas):
+        """Sustituye las coordenadas de todos los nudos existentes a la vez.
+
+        Parameters
+        ----------
+        coordenadas : mapping
+            ``nudo -> (x, y)`` en m. Debe incluir exactamente los nudos actuales.
+
+        Raises
+        ------
+        ValueError
+            Nudos de más o de menos, o alguna barra con longitud 0.
+        """
+        if set(coordenadas) != set(self._nodos):
+            raise ValueError(
+                "Las coordenadas deben incluir exactamente los nudos actuales; "
+                "no se pueden añadir ni quitar nudos."
+            )
+        nuevos = {}
+        for nudo, xy in coordenadas.items():
+            nudo = self._exigir_nudo(nudo, "nudo")
+            try:
+                x, y = xy
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"La coordenada del nudo {nudo} debe ser un par (x, y)."
+                ) from exc
+            nuevos[nudo] = (_real(x, "x"), _real(y, "y"))
+        anterior = dict(self._nodos)
+        self._nodos = nuevos
+        try:
+            for barra, (i, j) in self._barras.items():
+                if self._longitud_entre(i, j) == 0.0:
+                    raise ValueError(
+                        f"Las coordenadas dejan la barra {barra!r} con longitud 0."
+                    )
+        except ValueError:
+            self._nodos = anterior
+            raise
 
     def longitud(self, barra):
         """Longitud de una barra en m."""
