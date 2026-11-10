@@ -1,6 +1,6 @@
 # armadura-2d-andresdperezc
 
-Librería didáctica en Python para **armaduras 2D isostáticas** (mecánica vectorial): fuerzas internas, reacciones y clasificación tensión/compresión.
+Librería didáctica en Python para **armaduras 2D isostáticas** (mecánica vectorial). Resuelve el equilibrio nodal `A x = b`, clasifica cada barra en **tensión** / **compresión** / nula y dibuja la figura.
 
 Se instala con **guion** y se importa con **guion bajo**:
 
@@ -9,38 +9,192 @@ pip install armadura-2d-andresdperezc
 from armadura_2d_andresdperezc import Armadura2D
 ```
 
+La GUI de Streamlit **no** forma parte del paquete: vive en este repositorio (`streamlit_app.py`) y en la imagen Docker. El paquete no depende de Streamlit ni de Tkinter.
+
 Versión **0.1.0**. Python **≥ 3.10**. Licencia **MIT**.
 
-La GUI de Streamlit **no** forma parte del paquete PyPI: vive en este repositorio (`streamlit_app.py`). Los cuatro presets (**Triángulo**, **Warren**, **Pratt**, **Howe**) se resuelven y `graficar()` devuelve una figura matplotlib (tensión/compresión).
+## Requisitos y sistemas
 
-## Instalación de desarrollo
+Corre en **Windows, Linux y macOS** (Python 3.10 o superior).
+
+| Uso | Windows | Linux | macOS |
+|---|---|---|---|
+| `pip install` + NumPy + matplotlib | Sí | Sí | Sí |
+| pytest y notebook | Sí | Sí | Sí |
+| Streamlit en el navegador | Sí | Sí | Sí |
+| Docker + Streamlit | Sí (Docker Desktop) | Sí | Sí |
+
+Tkinter **no** es requisito. En Linux no hace falta `python3-tk`.
+
+## Instalación
+
+Cuando el paquete esté en [PyPI](https://pypi.org/project/armadura-2d-andresdperezc/):
+
+```bash
+pip install armadura-2d-andresdperezc
+```
+
+Eso instala la **lógica (NumPy) y los gráficos matplotlib**. No instala Streamlit ni copia `streamlit_app.py`.
+
+### Desarrollo (modo editable)
+
+Desde la carpeta del proyecto:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[gui,dev]"
+python -m pip install -e ".[dev,docs]"
 ```
+
+En Linux o macOS: `source .venv/bin/activate` y el mismo `pip install`.
+
+Si el comando `python` no está en el PATH (Windows), use el launcher `py`.
+
+Extras opcionales:
+
+| Extra | Qué añade |
+|---|---|
+| `[gui]` | Streamlit, para `streamlit run streamlit_app.py` (hace falta el archivo del repo) |
+| `[dev]` | pytest, build, twine, Jupyter |
+| `[docs]` | Sphinx, Furo, rinohtype |
+
+Todo junto: `python -m pip install -e ".[gui,dev,docs]"`.
+
+Si PowerShell bloquea `Activate.ps1`: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (una sola vez).
+
+## Uso básico
 
 ```python
 from armadura_2d_andresdperezc import Armadura2D
 
-a = Armadura2D.preset_triangulo()
+a = Armadura2D.preset_triangulo()  # también preset_warren, preset_pratt, preset_howe
 r = a.resolver()
 print(r.equilibrio.ok)
 for barra in r.fuerzas:
     print(barra.id, barra.tipo, barra.fuerza)
-a.graficar(r)
+
+fig = a.graficar(r)
+fig.savefig("triangulo.png")
 ```
 
+Unidades fijas: **kN** y **m**. El eje `y` es positivo hacia arriba. Tensión `N > 0`; compresión `N < 0`.
+
+El triángulo de libro (base 4 m, altura 3 m, 50 kN hacia abajo en la cúspide) da `Ry = 25 kN` en cada apoyo, B1 `=+50/3 kN` (tensión) y B2 = B3 `= −(25/3)√13 kN` (compresión).
+
+### Métodos de `Armadura2D`
+
+| Método | Resultado |
+|---|---|
+| `preset_triangulo()` / `preset_warren()` / `preset_pratt()` / `preset_howe()` | Armadura lista para `resolver()` |
+| `agregar_nodo` / `agregar_barra` / `agregar_apoyo` / `agregar_carga` | Construcción libre (librería; la GUI 0.1.0 no la expone) |
+| `definir_apoyos(fijo, movil)` | Exactamente un pin y un rodillo vertical |
+| `definir_cargas([(nudo, fx, fy), ...])` | Sustituye el conjunto de cargas |
+| `reemplazar_coordenadas({id: (x, y), ...})` | Mueve todos los nudos a la vez |
+| `longitud(barra)` / `angulo(barra)` | `L` en m y ángulo en radianes |
+| `resolver()` | `ResultadoArmadura` (fuerzas, reacciones, equilibrio) |
+| `verificar_equilibrio(resultado=None)` | Residuos `Σ Fx`, `Σ Fy`, `Σ M` |
+| `graficar(resultado=None)` | `matplotlib.figure.Figure` (no llama a `plt.show()`) |
+| `snapshot_nodos()` / `snapshot_barras()` / `snapshot_apoyos()` / `snapshot_cargas()` | Lectura para GUI y scripts (sin tocar `_nodos`) |
+
+Los gráficos **devuelven** la figura. En un script se guarda el PNG; en un notebook se muestra sola. En tests y Docker use el backend `Agg`.
+
+Si la armadura no es isostática (`m + r = 2j`) o `A` es singular, se lanza `ValueError` con un mensaje en español.
+
+### Unidades
+
+| Magnitud | Unidad |
+|---|---|
+| Fuerza interna, reacción, carga | kN |
+| Coordenadas y longitudes | m |
+| Ángulo | rad |
+| Momento (residuo de equilibrio) | kN·m |
+
+### Presets
+
+| Nombre | Geometría por defecto | Carga | Signo típico de las diagonales |
+|---|---|---|---|
+| Triángulo | 4 m × 3 m, 3 nudos | 50 kN en la cúspide | — |
+| Warren | puente 4 m × 2 m, 2 paneles | 50 kN en el tablero central | — |
+| Pratt | 6 nudos; diagonales hacia el centro | igual | **tensión** (`3-1`, `5-1`) |
+| Howe | mismas cuerdas; diagonales hacia los apoyos | igual | **compresión** (`4-0`, `4-2`) |
+
+La GUI solo ofrece estos cuatro; se pueden editar coordenadas, apoyos y cargas, **no** añadir ni quitar barras.
+
+## Ejemplos (sin Streamlit)
+
+Demuestran que el paquete funciona **solo con pip**:
+
+- `python ejemplo_consola.py` — triángulo de libro, Pratt y Howe; PNG en `examples/`.
+- `examples/notebook_didactico.ipynb` — teoría breve y llamadas a la librería (Jupyter; kernel del `.venv`).
+
+## Pruebas
+
 ```powershell
+python -m pip install -e ".[dev]"
 pytest -v
-python ejemplo_consola.py
+```
+
+Los tests contrastan el triángulo de libro, isostática y residuos ≈ 0 en los cuatro presets, signos Pratt vs Howe, `graficar()` → `Figure` y los `ValueError` de geometría ilegal. CI: `.github/workflows/tests.yml`.
+
+## GUI (Streamlit, opcional)
+
+La interfaz **no se publica en PyPI**. Hay que clonar este repositorio:
+
+```powershell
+python -m pip install -e ".[gui]"
 streamlit run streamlit_app.py
 ```
 
-El notebook didáctico (sin Streamlit) está en `examples/notebook_didactico.ipynb`. Use el kernel del `.venv`.
+Abra http://localhost:8501. Radio de presets, sliders de base/altura, tablas de nudos y cargas. La GUI convierte “vertical hacia abajo (+)” a `Fy` negativa; no arma la matriz `A`.
 
-Decisiones de dominio y el plan por fases están en `CONTEXTO_DESARROLLO.md`. La receta de empaquetado está en `ARQUITECTURA_REPLICABLE.md`.
+## Docker
 
-Autor: Andrés David Pérez Criollo — adperezc@udistrital.edu.co
+Cualquier sistema con Docker abre la misma GUI en el navegador (no usa Tkinter). Streamlit escucha en `0.0.0.0:8501`.
+
+```bash
+docker build -t andresperez3/armadura-2d-andresdperezc:0.1.0 .
+docker run --rm -p 8501:8501 andresperez3/armadura-2d-andresdperezc:0.1.0
+```
+
+http://localhost:8501
+
+El `docker push` a Docker Hub (usuario `andresperez3`) y GitHub Pages: [`DESPLIEGUE.md`](DESPLIEGUE.md).
+
+## Documentación (Sphinx)
+
+```powershell
+python -m pip install -e ".[docs]"
+sphinx-build -b html docs docs/_build/html
+sphinx-build -b rinoh docs docs/_build/rinoh
+```
+
+HTML: `docs/_build/html/index.html`. PDF: `docs/_build/rinoh/armadura-2d-andresdperezc.pdf`.
+
+GitHub Pages: *Settings → Pages → GitHub Actions* (flujo en `.github/workflows/pages.yml`).
+
+## Publicar en PyPI (lo hace el autor)
+
+Paso a paso, primero TestPyPI y luego PyPI: [`PUBLICAR_PYPI.md`](PUBLICAR_PYPI.md).
+
+Solo se instala `src/armadura_2d_andresdperezc/`. `streamlit_app.py`, tests, docs, Docker y el notebook quedan fuera del wheel.
+
+## Limitaciones (0.1.0)
+
+- Solo **2D** e **isostáticas**. Hiperestática, mecanismo o `A` singular → `ValueError`.
+- Cargas solo en nudos. Sin peso propio ni carga distribuida en la barra.
+- Apoyos: un fijo (Rx, Ry) y un móvil vertical (Ry). Sin empotramiento ni rodillo inclinado.
+- Sin pórticos, momento flector, 3D, diámetro, esfuerzo `σ = N/A`, pandeo ni códigos NSR/AISC.
+- La GUI no dibuja armaduras arbitrarias: solo los cuatro presets, misma topología.
+- Unidades fijas kN y m.
+
+Si el desarrollo se **expande**, hay que **volver a validarlo**.
+
+**Futuro** (no es deuda de esta versión): (1) diseñar / dibujar cualquier armadura en la aplicación y correr el mismo `resolver()` — la librería ya tiene `agregar_*`; (2) diámetro o sección por barra y `σ = N/A` como postproceso, sin cambiar `A x = b`.
+
+## Autor
+
+Andrés David Pérez Criollo — adperezc@udistrital.edu.co
+
+Universidad Distrital Francisco José de Caldas.
+
+Licencia MIT. Ver [`LICENSE`](LICENSE).
