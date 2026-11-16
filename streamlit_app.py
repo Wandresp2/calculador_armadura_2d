@@ -27,6 +27,7 @@ import streamlit as st
 
 try:
     from armadura_2d_andresdperezc import Armadura2D
+    from plano_ui import efecto_clic, figura_plano, firma_seleccion, leer_punto
 except ImportError:
     raise SystemExit(
         "No se encontró la librería 'armadura_2d_andresdperezc'.\n"
@@ -404,7 +405,25 @@ def _reiniciar_propia(armadura):
     st.session_state.fijo_fuente = fijo
     st.session_state.movil_fuente = movil
     st.session_state.tipo_fuente = tipo
+    _olvidar_clic()
     st.rerun()
+
+
+def _olvidar_clic():
+    st.session_state.barra_origen = None
+    st.session_state.clic_aplicado = None
+    st.session_state.plano_aviso = ""
+
+
+def _guardar_tablas(resultado):
+    st.session_state.nodos_fuente = resultado["nodos"]
+    st.session_state.barras_fuente = resultado["barras"]
+    st.session_state.cargas_fuente = resultado["cargas"]
+    st.session_state.fijo_fuente = resultado["fijo"]
+    st.session_state.movil_fuente = resultado["movil"]
+    st.session_state.tipo_fuente = resultado["tipo_movil"] or "movil"
+    st.session_state.barra_origen = resultado["origen"]
+    st.session_state.propia_version += 1
 
 
 def _vista_parcial(filas_nodos, filas_barras, nudo_fijo, nudo_movil, tipo_movil, filas_carga):
@@ -474,10 +493,10 @@ def _vista_parcial(filas_nodos, filas_barras, nudo_fijo, nudo_movil, tipo_movil,
 def _bloque_propia():
     _asegurar_propia()
     st.caption(
-        "A la izquierda escribes nudos, barras, apoyos y cargas. "
-        "A la derecha el plano cartesiano muestra cómo va quedando: "
-        "cada barra lleva su longitud. "
-        "Las fuerzas se calculan más abajo, cuando la armadura se puede resolver."
+        "A la izquierda están las tablas. A la derecha puedes armar la misma "
+        "armadura sobre el plano: elige nudo, barra, apoyo o carga y pulsa. "
+        "Los nudos caen en la cuadrícula de 0,5 m. "
+        "Borrar un elemento o afinar una coordenada se hace en la tabla."
     )
     acciones = st.columns(2)
     if acciones[0].button("Empezar desde el triángulo", key="btn_triangulo"):
@@ -490,6 +509,7 @@ def _bloque_propia():
         st.session_state.fijo_fuente = None
         st.session_state.movil_fuente = None
         st.session_state.tipo_fuente = "movil"
+        _olvidar_clic()
         st.rerun()
 
     version = st.session_state.propia_version
@@ -580,29 +600,20 @@ def _bloque_propia():
             )
             st.session_state.cargas_fuente = _filas(cargas_edit)
 
+    cargas_plano = (
+        _filas(cargas_edit)
+        if not error_ids and len(ids) >= 2
+        else list(st.session_state.cargas_fuente)
+    )
     with col_plano:
-        st.subheader("Plano")
-        st.caption(
-            "Ejes en metros. El número de cada barra es su longitud. "
-            "Los apoyos y las cargas aparecen cuando ya están definidos."
+        _plano_interactivo(
+            filas_nodos,
+            filas_barras,
+            nudo_fijo,
+            nudo_movil,
+            tipo_movil,
+            cargas_plano,
         )
-        try:
-            vista, avisos = _vista_parcial(
-                filas_nodos,
-                filas_barras,
-                nudo_fijo,
-                nudo_movil,
-                tipo_movil,
-                _filas(cargas_edit) if cargas_edit else [],
-            )
-        except ValueError as exc:
-            vista, avisos = None, [str(exc)]
-        if vista is not None and vista.snapshot_nodos():
-            _mostrar_figura(vista.graficar_plano())
-        else:
-            st.info("El plano aparece en cuanto agregues el primer nudo.")
-        for aviso in avisos[:4]:
-            st.caption(aviso)
 
     if error_ids or len(ids) < 2:
         return None, None, error_ids
@@ -618,6 +629,154 @@ def _bloque_propia():
         return _resolver(armadura)
     except ValueError as exc:
         return None, None, str(exc)
+
+
+def _plano_interactivo(
+    filas_nodos,
+    filas_barras,
+    nudo_fijo,
+    nudo_movil,
+    tipo_movil,
+    filas_carga,
+):
+    st.subheader("Plano")
+    modo = st.radio(
+        "Qué quieres colocar",
+        ["Nudo", "Barra", "Apoyo", "Carga"],
+        horizontal=True,
+        key="modo_plano",
+    )
+    apoyo_codigo = "fijo"
+    horizontal = 0.0
+    vertical_abajo = 0.0
+    if modo == "Nudo":
+        st.caption("Pulsa un punto gris. El nudo queda en el cruce de 0,5 m más cercano.")
+    elif modo == "Barra":
+        st.caption("Pulsa un nudo y después el otro. El nudo elegido se marca en dorado.")
+    elif modo == "Apoyo":
+        apoyo_codigo = {
+            "Fijo": "fijo",
+            "Móvil en piso": "movil",
+            "Móvil en pared": "movil_pared",
+        }[
+            st.radio(
+                "Tipo de apoyo",
+                ["Fijo", "Móvil en piso", "Móvil en pared"],
+                horizontal=True,
+                key="apoyo_plano",
+            )
+        ]
+        st.caption("Después pulsa el nudo. Solo hay un fijo y un móvil.")
+    else:
+        c1, c2 = st.columns(2)
+        horizontal = c1.number_input(
+            "Horizontal →+ (kN)",
+            min_value=-CARGA_MAX,
+            max_value=CARGA_MAX,
+            value=0.0,
+            step=1.0,
+            key="carga_fx_plano",
+        )
+        vertical_abajo = c2.number_input(
+            "Vertical hacia abajo (kN)",
+            min_value=-CARGA_MAX,
+            max_value=CARGA_MAX,
+            value=0.0,
+            step=1.0,
+            key="carga_abajo_plano",
+        )
+        st.caption("Escribe la carga y después pulsa el nudo. Reemplaza la carga de ese nudo.")
+
+    try:
+        vista, avisos = _vista_parcial(
+            filas_nodos,
+            filas_barras,
+            nudo_fijo,
+            nudo_movil,
+            tipo_movil,
+            filas_carga,
+        )
+    except ValueError as exc:
+        vista, avisos = None, [str(exc)]
+    try:
+        figura = figura_plano(vista, st.session_state.get("barra_origen"))
+    except ImportError:
+        st.error("Falta Plotly. Con el entorno activo: python -m pip install plotly")
+        return
+    estado = st.plotly_chart(
+        figura,
+        on_select="rerun",
+        selection_mode="points",
+        key="plano_interaccion",
+        theme=None,
+        width="stretch",
+        config={"displaylogo": False},
+    )
+    for aviso in (avisos or [])[:3]:
+        st.caption(aviso)
+    _aplicar_clic_plano(
+        estado,
+        modo,
+        apoyo_codigo,
+        horizontal,
+        vertical_abajo,
+        filas_nodos,
+        filas_barras,
+        nudo_fijo,
+        nudo_movil,
+        tipo_movil,
+        filas_carga,
+    )
+
+
+def _aplicar_clic_plano(
+    estado,
+    modo,
+    apoyo_codigo,
+    horizontal,
+    vertical_abajo,
+    filas_nodos,
+    filas_barras,
+    nudo_fijo,
+    nudo_movil,
+    tipo_movil,
+    filas_carga,
+):
+    punto = leer_punto(estado)
+    firma = firma_seleccion(punto, modo, horizontal, vertical_abajo, apoyo_codigo)
+    if st.session_state.get("modo_plano_prev") != modo:
+        st.session_state.modo_plano_prev = modo
+        st.session_state.barra_origen = None
+        st.session_state.clic_aplicado = firma
+        return
+    if not punto or firma == st.session_state.get("clic_aplicado"):
+        if st.session_state.get("plano_aviso"):
+            st.caption(st.session_state.plano_aviso)
+        return
+    resultado = efecto_clic(
+        modo,
+        punto.get("customdata"),
+        punto.get("x"),
+        punto.get("y"),
+        filas_nodos,
+        filas_barras,
+        nudo_fijo,
+        nudo_movil,
+        tipo_movil,
+        filas_carga or [],
+        st.session_state.get("barra_origen"),
+        horizontal,
+        vertical_abajo,
+        apoyo_codigo,
+    )
+    st.session_state.clic_aplicado = firma
+    st.session_state.plano_aviso = resultado["aviso"]
+    st.session_state.barra_origen = resultado["origen"]
+    if resultado["aviso"]:
+        st.caption(resultado["aviso"])
+    if resultado["cambio"]:
+        _guardar_tablas(resultado)
+        st.rerun()
 
 
 def _longitudes(armadura):
