@@ -285,6 +285,24 @@ def test_graficar_sin_nudos():
         Armadura2D().graficar()
 
 
+def test_graficar_plano_sin_resolver():
+    armadura = Armadura2D(nombre="en obra")
+    armadura.agregar_nodo(0, 0.0, 0.0)
+    armadura.agregar_nodo(1, 3.0, 4.0)
+    armadura.agregar_barra("B1", 0, 1)
+    armadura.agregar_apoyo(0, "fijo")
+    armadura.agregar_carga(1, fy=-10.0)
+    figura = armadura.graficar_plano()
+    assert isinstance(figura, Figure)
+    eje = figura.axes[0]
+    assert eje.get_xlabel() == "x (m)"
+    assert eje.get_ylabel() == "y (m)"
+    assert any(isinstance(p, Circle) for p in eje.patches)
+    assert any(isinstance(p, Polygon) for p in eje.patches)
+    with pytest.raises(ValueError, match="nudos"):
+        Armadura2D().graficar_plano()
+
+
 def test_snapshot_y_reemplazar_coordenadas():
     armadura = Armadura2D.preset_triangulo()
     nudos = armadura.snapshot_nodos()

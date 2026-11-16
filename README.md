@@ -120,7 +120,7 @@ Si la armadura no es isostática (`m + r = 2j`) o `A` es singular, se lanza `Val
 | Pratt | 6 nudos; diagonales hacia el centro | igual | **tensión** (`3-1`, `5-1`) |
 | Howe | mismas cuerdas; diagonales hacia los apoyos | igual | **compresión** (`4-0`, `4-2`) |
 
-La GUI ofrece estos cuatro y, además, una armadura propia: nudos, barras, cargas y apoyos.
+La GUI ofrece estos cuatro y, además, una armadura propia: nudos, barras, cargas y apoyos. Al armarla, un plano cartesiano al lado de las tablas muestra nudos, barras con su longitud, apoyos y cargas.
 
 ## Ejemplos (sin Streamlit)
 

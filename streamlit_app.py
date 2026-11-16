@@ -407,13 +407,77 @@ def _reiniciar_propia(armadura):
     st.rerun()
 
 
+def _vista_parcial(filas_nodos, filas_barras, nudo_fijo, nudo_movil, tipo_movil, filas_carga):
+    """Arma lo que ya se puede dibujar, aunque el cálculo todavía no cierre."""
+    armadura = Armadura2D(nombre="Propia")
+    avisos = []
+    ids = set()
+    for fila in filas_nodos:
+        try:
+            nudo = _id_entero(fila.get("nudo"))
+        except ValueError as exc:
+            avisos.append(str(exc))
+            continue
+        if nudo is None:
+            continue
+        if nudo in ids:
+            avisos.append(f"El nudo {nudo} está repetido; en el plano queda la primera posición.")
+            continue
+        armadura.agregar_nodo(
+            nudo, _numero(fila.get("x (m)")), _numero(fila.get("y (m)"))
+        )
+        ids.add(nudo)
+
+    usadas = set()
+    for indice, fila in enumerate(filas_barras, start=1):
+        try:
+            nudo_i = _id_entero(fila.get("nudo i"))
+            nudo_j = _id_entero(fila.get("nudo j"))
+        except ValueError as exc:
+            avisos.append(str(exc))
+            continue
+        if nudo_i is None or nudo_j is None:
+            continue
+        barra = str(fila.get("barra") or "").strip() or f"B{indice}"
+        if nudo_i not in ids or nudo_j not in ids:
+            avisos.append(f"La barra {barra} une nudos que todavía no están en la tabla.")
+            continue
+        if barra in usadas:
+            avisos.append(f"La barra {barra!r} está repetida.")
+            continue
+        try:
+            armadura.agregar_barra(barra, nudo_i, nudo_j)
+            usadas.add(barra)
+        except ValueError as exc:
+            avisos.append(str(exc))
+
+    fijo_ok = nudo_fijo in ids
+    movil_ok = nudo_movil in ids and nudo_movil != nudo_fijo
+    if fijo_ok and movil_ok:
+        armadura.definir_apoyos(int(nudo_fijo), int(nudo_movil), tipo_movil or "movil")
+    else:
+        if fijo_ok:
+            armadura.agregar_apoyo(int(nudo_fijo), "fijo")
+        if movil_ok:
+            armadura.agregar_apoyo(int(nudo_movil), tipo_movil or "movil")
+
+    for nudo, fx, fy in _cargas_desde_filas(filas_carga or []):
+        if nudo not in ids or (fx == 0.0 and fy == 0.0):
+            continue
+        try:
+            armadura.agregar_carga(nudo, fx, fy)
+        except ValueError as exc:
+            avisos.append(str(exc))
+    return armadura, avisos
+
+
 def _bloque_propia():
     _asegurar_propia()
     st.caption(
-        "Escribe cada nudo con su posición en metros. "
-        "Luego indica qué nudos une cada barra. "
-        "Puedes agregar o borrar filas. "
-        "La longitud de la barra la calcula el programa."
+        "A la izquierda escribes nudos, barras, apoyos y cargas. "
+        "A la derecha el plano cartesiano muestra cómo va quedando: "
+        "cada barra lleva su longitud. "
+        "Las fuerzas se calculan más abajo, cuando la armadura se puede resolver."
     )
     acciones = st.columns(2)
     if acciones[0].button("Empezar desde el triángulo", key="btn_triangulo"):
@@ -429,84 +493,123 @@ def _bloque_propia():
         st.rerun()
 
     version = st.session_state.propia_version
-    st.subheader("Nudos")
-    nodos_edit = st.data_editor(
-        st.session_state.nodos_fuente,
-        hide_index=True,
-        num_rows="dynamic",
-        key=f"nodos_p_{version}",
-        column_config={
-            "nudo": st.column_config.NumberColumn(
-                format="%d", step=1, help="Identificador entero. Puede ser 0."
-            ),
-            "x (m)": st.column_config.NumberColumn(format="%.3f", step=0.1),
-            "y (m)": st.column_config.NumberColumn(format="%.3f", step=0.1),
-        },
-    )
-    st.subheader("Barras")
-    barras_edit = st.data_editor(
-        st.session_state.barras_fuente,
-        hide_index=True,
-        num_rows="dynamic",
-        key=f"barras_p_{version}",
-        column_config={
-            "barra": st.column_config.TextColumn(help="Por ejemplo B1. Si se deja vacía, se numera sola."),
-            "nudo i": st.column_config.NumberColumn(format="%d", step=1),
-            "nudo j": st.column_config.NumberColumn(format="%d", step=1),
-        },
-    )
-    filas_nodos = _filas(nodos_edit)
-    try:
-        ids = []
-        for fila in filas_nodos:
-            nudo = _id_entero(fila.get("nudo"))
-            if nudo is not None and nudo not in ids:
-                ids.append(nudo)
-    except ValueError as exc:
-        return None, None, str(exc)
-
-    if len(ids) < 2:
-        st.info("Agrega al menos dos nudos y una barra para poder calcular.")
-        return None, None, None
-
-    nudo_fijo, nudo_movil, tipo_movil = _elegir_apoyos(
-        ids,
-        st.session_state.fijo_fuente,
-        st.session_state.movil_fuente,
-        st.session_state.tipo_fuente,
-        f"propia_{version}",
-    )
-    st.session_state.fijo_fuente = nudo_fijo
-    st.session_state.movil_fuente = nudo_movil
-    st.session_state.tipo_fuente = tipo_movil
-
-    mapa = {}
-    for fila in st.session_state.cargas_fuente:
-        try:
-            nudo = _id_entero(fila.get("nudo"))
-        except ValueError:
-            nudo = None
-        if nudo is not None:
-            mapa[nudo] = fila
-    filas_carga = []
-    for nudo in ids:
-        previa = mapa.get(nudo, {})
-        filas_carga.append(
-            {
-                "nudo": nudo,
-                "horizontal →+ (kN)": _numero(previa.get("horizontal →+ (kN)")),
-                "vertical hacia abajo (kN)": _numero(
-                    previa.get("vertical hacia abajo (kN)")
+    col_form, col_plano = st.columns((1.15, 0.95), vertical_alignment="top")
+    with col_form:
+        st.subheader("Nudos")
+        nodos_edit = st.data_editor(
+            st.session_state.nodos_fuente,
+            hide_index=True,
+            num_rows="dynamic",
+            key=f"nodos_p_{version}",
+            column_config={
+                "nudo": st.column_config.NumberColumn(
+                    format="%d", step=1, help="Identificador entero. Puede ser 0."
                 ),
-            }
+                "x (m)": st.column_config.NumberColumn(format="%.3f", step=0.1),
+                "y (m)": st.column_config.NumberColumn(format="%.3f", step=0.1),
+            },
         )
-    cargas_edit = _tabla_cargas(filas_carga, f"cargas_p_{version}_{tuple(ids)}")
-    st.session_state.cargas_fuente = _filas(cargas_edit)
+        st.subheader("Barras")
+        barras_edit = st.data_editor(
+            st.session_state.barras_fuente,
+            hide_index=True,
+            num_rows="dynamic",
+            key=f"barras_p_{version}",
+            column_config={
+                "barra": st.column_config.TextColumn(
+                    help="Por ejemplo B1. Si se deja vacía, se numera sola."
+                ),
+                "nudo i": st.column_config.NumberColumn(format="%d", step=1),
+                "nudo j": st.column_config.NumberColumn(format="%d", step=1),
+            },
+        )
+        filas_nodos = _filas(nodos_edit)
+        filas_barras = _filas(barras_edit)
+        try:
+            ids = []
+            for fila in filas_nodos:
+                nudo = _id_entero(fila.get("nudo"))
+                if nudo is not None and nudo not in ids:
+                    ids.append(nudo)
+            error_ids = None
+        except ValueError as exc:
+            ids = []
+            error_ids = str(exc)
 
+        nudo_fijo = nudo_movil = None
+        tipo_movil = st.session_state.tipo_fuente or "movil"
+        cargas_edit = []
+        if error_ids:
+            st.error(error_ids)
+        elif len(ids) < 2:
+            st.info("Agrega al menos dos nudos y una barra para poder calcular.")
+        else:
+            nudo_fijo, nudo_movil, tipo_movil = _elegir_apoyos(
+                ids,
+                st.session_state.fijo_fuente,
+                st.session_state.movil_fuente,
+                st.session_state.tipo_fuente,
+                f"propia_{version}",
+            )
+            st.session_state.fijo_fuente = nudo_fijo
+            st.session_state.movil_fuente = nudo_movil
+            st.session_state.tipo_fuente = tipo_movil
+
+            mapa = {}
+            for fila in st.session_state.cargas_fuente:
+                try:
+                    nudo = _id_entero(fila.get("nudo"))
+                except ValueError:
+                    nudo = None
+                if nudo is not None:
+                    mapa[nudo] = fila
+            filas_carga = []
+            for nudo in ids:
+                previa = mapa.get(nudo, {})
+                filas_carga.append(
+                    {
+                        "nudo": nudo,
+                        "horizontal →+ (kN)": _numero(previa.get("horizontal →+ (kN)")),
+                        "vertical hacia abajo (kN)": _numero(
+                            previa.get("vertical hacia abajo (kN)")
+                        ),
+                    }
+                )
+            cargas_edit = _tabla_cargas(
+                filas_carga, f"cargas_p_{version}_{tuple(ids)}"
+            )
+            st.session_state.cargas_fuente = _filas(cargas_edit)
+
+    with col_plano:
+        st.subheader("Plano")
+        st.caption(
+            "Ejes en metros. El número de cada barra es su longitud. "
+            "Los apoyos y las cargas aparecen cuando ya están definidos."
+        )
+        try:
+            vista, avisos = _vista_parcial(
+                filas_nodos,
+                filas_barras,
+                nudo_fijo,
+                nudo_movil,
+                tipo_movil,
+                _filas(cargas_edit) if cargas_edit else [],
+            )
+        except ValueError as exc:
+            vista, avisos = None, [str(exc)]
+        if vista is not None and vista.snapshot_nodos():
+            _mostrar_figura(vista.graficar_plano())
+        else:
+            st.info("El plano aparece en cuanto agregues el primer nudo.")
+        for aviso in avisos[:4]:
+            st.caption(aviso)
+
+    if error_ids or len(ids) < 2:
+        return None, None, error_ids
     try:
         armadura = _armar_propia(
             filas_nodos,
-            _filas(barras_edit),
+            filas_barras,
             nudo_fijo,
             nudo_movil,
             tipo_movil,

@@ -928,6 +928,132 @@ class Armadura2D:
         ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
         return fig
 
+    def graficar_plano(self):
+        """Dibuja la geometría actual, sin resolver el equilibrio.
+
+        Muestra nudos, barras con su longitud, apoyos y cargas sobre los
+        ejes x e y. Sirve para ver la armadura mientras se está armando,
+        aunque todavía no sea isostática.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+
+        Raises
+        ------
+        ValueError
+            Si no hay nudos.
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Circle, Polygon
+
+        if not self._nodos:
+            raise ValueError("La armadura no tiene nudos.")
+
+        span = self._span_dibujo()
+        fig, ax = plt.subplots(figsize=(6.4, 6.2), layout="constrained")
+        color_barra = "#3D5A80"
+
+        for barra_id, (nudo_i, nudo_j) in self._barras.items():
+            x_i, y_i = self._nodos[nudo_i]
+            x_j, y_j = self._nodos[nudo_j]
+            ax.plot(
+                [x_i, x_j],
+                [y_i, y_j],
+                color=color_barra,
+                linewidth=2.6,
+                solid_capstyle="round",
+                zorder=2,
+            )
+            largo = self._longitud_entre(nudo_i, nudo_j)
+            mx, my = (x_i + x_j) / 2.0, (y_i + y_j) / 2.0
+            dx, dy = x_j - x_i, y_j - y_i
+            hipot = largo or 1.0
+            nx, ny = -dy / hipot, dx / hipot
+            off = 0.05 * span
+            ax.text(
+                mx + off * nx,
+                my + off * ny,
+                f"{barra_id}\n{largo:.2f} m",
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="#1C2333",
+                zorder=4,
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.88),
+            )
+
+        radio_nudo = 0.035 * span
+        for nudo, (x, y) in self._nodos.items():
+            ax.add_patch(
+                Circle(
+                    (x, y),
+                    radio_nudo,
+                    facecolor="#F6F3EC",
+                    edgecolor="#0B1F3A",
+                    linewidth=1.4,
+                    zorder=5,
+                )
+            )
+            ax.text(
+                x,
+                y + 1.8 * radio_nudo,
+                str(nudo),
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                fontweight="bold",
+                color="#0B1F3A",
+                zorder=6,
+            )
+            tipo_apoyo = self._apoyos.get(nudo)
+            if tipo_apoyo == "fijo":
+                self._dibujar_apoyo_fijo(ax, x, y, span, Polygon)
+            elif tipo_apoyo == "movil":
+                self._dibujar_apoyo_movil(ax, x, y, span, Circle, Polygon)
+            elif tipo_apoyo == "movil_pared":
+                self._dibujar_apoyo_pared(ax, x, y, span, Circle, Polygon)
+
+        cargas = [
+            (nudo, fx, fy)
+            for nudo, (fx, fy) in self._cargas.items()
+            if math.hypot(fx, fy) > self.EPS_FUERZA_NULA
+        ]
+        f_max = max((math.hypot(fx, fy) for _nudo, fx, fy in cargas), default=1.0)
+        if f_max <= 0.0:
+            f_max = 1.0
+        for nudo, fx, fy in cargas:
+            x, y = self._nodos[nudo]
+            self._flecha(
+                ax,
+                x,
+                y,
+                fx,
+                fy,
+                span,
+                f_max,
+                self.COLOR_CARGA,
+                hacia_nudo=True,
+                etiqueta=f"{math.hypot(fx, fy):.1f} kN",
+            )
+        if cargas:
+            ax.plot([], [], color=self.COLOR_CARGA, lw=1.8, label="carga")
+            ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
+
+        ax.axhline(0.0, color="#C5CDD6", lw=0.8, zorder=0)
+        ax.axvline(0.0, color="#C5CDD6", lw=0.8, zorder=0)
+        ax.set_aspect("equal")
+        ax.set_xlabel("x (m)")
+        ax.set_ylabel("y (m)")
+        ax.set_title("Plano de la armadura")
+        ax.grid(True, alpha=0.28)
+        xs = [xy[0] for xy in self._nodos.values()]
+        ys = [xy[1] for xy in self._nodos.values()]
+        margen = 0.62 * span
+        ax.set_xlim(min(xs) - margen, max(xs) + margen)
+        ax.set_ylim(min(ys) - margen, max(ys) + margen)
+        return fig
+
     def graficar_nudo(self, nudo, resultado=None):
         """Dibuja el cuerpo libre de un nudo.
 

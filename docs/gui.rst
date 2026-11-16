@@ -18,7 +18,7 @@ Abra http://localhost:8501. La página se lee de arriba hacia abajo:
 1. Qué hace el programa.
 2. Datos: armadura **precargada** (Triángulo, Warren, Pratt, Howe, con
    base, altura, nudos, apoyos y cargas) o **propia** (tablas para
-   agregar y quitar nudos y barras).
+   agregar y quitar nudos y barras, con el plano cartesiano al lado).
 3. Figura con color, fuerza en cada barra, cargas y reacciones.
 4. Tablas de resultados.
 5. Sistema completo de ecuaciones y cuerpo libre de cada nudo
