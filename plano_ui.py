@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 
 PASO_MALLA = 0.5
+MARGEN_MALLA = 4.0
 
 
 def ajustar_malla(valor):
@@ -116,16 +117,34 @@ def clasificar_punto(customdata):
     return "rejilla", None
 
 
-def leer_punto(estado):
-    """Último punto elegido en el gráfico de Plotly, o ``None``."""
+def leer_puntos(estado):
+    """Puntos elegidos en el gráfico de Plotly."""
     if not estado:
-        return None
+        return []
     seleccion = estado.get("selection") if hasattr(estado, "get") else None
     if not seleccion:
-        return None
+        return []
     puntos = seleccion.get("points") if hasattr(seleccion, "get") else None
+    return list(puntos or [])
+
+
+def elegir_punto(puntos, modo, origen):
+    """Elige el punto que corresponde al clic nuevo.
+
+    Si la selección todavía incluye el primer extremo de una barra, usa el
+    otro nudo. Si hay un nudo y un punto de la cuadrícula, usa el nudo.
+    """
     if not puntos:
         return None
+    if modo == "Barra" and origen is not None:
+        for punto in reversed(puntos):
+            clase, nudo = clasificar_punto(punto.get("customdata"))
+            if clase == "nudo" and nudo != origen:
+                return punto
+    for punto in reversed(puntos):
+        clase, _nudo = clasificar_punto(punto.get("customdata"))
+        if clase == "nudo":
+            return punto
     return puntos[-1]
 
 
@@ -280,15 +299,24 @@ def _fmt(valor):
 
 
 def limites_malla(nodos):
-    """Rectángulo de la cuadrícula, en múltiplos de 0,5 m."""
+    """Rectángulo de la cuadrícula, en múltiplos de 0,5 m.
+
+    Deja cuatro metros libres alrededor del nudo más extremo, en las
+    cuatro direcciones, para poder seguir colocando nudos.
+    """
     xs = [_real(fila.get("x (m)")) for fila in nodos if _entero(fila.get("nudo")) is not None]
     ys = [_real(fila.get("y (m)")) for fila in nodos if _entero(fila.get("nudo")) is not None]
     if not xs:
-        return 0.0, 8.0, 0.0, 6.0
-    x0 = min(0.0, min(xs) - 2.0)
-    y0 = min(0.0, min(ys) - 2.0)
-    x1 = max(8.0, max(xs) + 2.0)
-    y1 = max(6.0, max(ys) + 2.0)
+        return -2.0, 10.0, -2.0, 8.0
+    return _encuadrar(
+        min(xs) - MARGEN_MALLA,
+        max(xs) + MARGEN_MALLA,
+        min(ys) - MARGEN_MALLA,
+        max(ys) + MARGEN_MALLA,
+    )
+
+
+def _encuadrar(x0, x1, y0, y1):
     return (
         ajustar_malla(math.floor(x0 / PASO_MALLA) * PASO_MALLA),
         ajustar_malla(math.ceil(x1 / PASO_MALLA) * PASO_MALLA),
@@ -312,29 +340,38 @@ def puntos_malla(nodos):
     return xs, ys
 
 
-def figura_plano(armadura, origen=None):
+def figura_plano(armadura, origen=None, recibir_nudos=True):
     """Figura de Plotly: cuadrícula, barras, nudos, apoyos y cargas.
 
-    Los puntos grises son los cruces donde se puede crear un nudo.
-    Los nudos llevan ``customdata`` ``nudo:<id>``.
+    Los puntos grises solo se pueden pulsar al colocar un nudo. En los
+    demás modos los clics caen en los nudos, para no pedir un segundo clic.
     """
     import plotly.graph_objects as go
 
     nodos = () if armadura is None else armadura.snapshot_nodos()
     filas = [{"nudo": nudo, "x (m)": x, "y (m)": y} for nudo, x, y in nodos]
-    malla_x, malla_y = puntos_malla(filas)
+    ocupados = {(ajustar_malla(x), ajustar_malla(y)) for _nudo, x, y in nodos}
     figura = go.Figure()
-    figura.add_trace(
-        go.Scatter(
-            x=malla_x,
-            y=malla_y,
-            mode="markers",
-            name="cuadrícula 0,5 m",
-            marker={"size": 7, "color": "#C5CED6"},
-            customdata=["rejilla"] * len(malla_x),
-            hovertemplate="x=%{x:.1f} m<br>y=%{y:.1f} m<extra></extra>",
+    if recibir_nudos:
+        malla_x, malla_y = puntos_malla(filas)
+        libres_x = []
+        libres_y = []
+        for x, y in zip(malla_x, malla_y):
+            if (x, y) in ocupados:
+                continue
+            libres_x.append(x)
+            libres_y.append(y)
+        figura.add_trace(
+            go.Scatter(
+                x=libres_x,
+                y=libres_y,
+                mode="markers",
+                name="cuadrícula 0,5 m",
+                marker={"size": 7, "color": "#C5CED6"},
+                customdata=["rejilla"] * len(libres_x),
+                hovertemplate="x=%{x:.1f} m<br>y=%{y:.1f} m<extra></extra>",
+            )
         )
-    )
     if armadura is not None:
         for barra, nudo_i, nudo_j in armadura.snapshot_barras():
             xi, yi = _xy(armadura, nudo_i)
@@ -356,17 +393,10 @@ def figura_plano(armadura, origen=None):
                 bgcolor="white",
                 font={"size": 11, "color": "#1C2333"},
             )
+        tam = _tamano_simbolo(nodos)
         for nudo, tipo in armadura.snapshot_apoyos():
             x, y = _xy(armadura, nudo)
-            texto = {"fijo": "fijo", "movil": "piso", "movil_pared": "pared"}.get(tipo, tipo)
-            figura.add_annotation(
-                x=x,
-                y=y - 0.55,
-                text=texto,
-                showarrow=False,
-                bgcolor="white",
-                font={"size": 11, "color": "#8A6A12"},
-            )
+            _dibujar_apoyo(figura, x, y, tipo, tam)
         for nudo, fx, fy in armadura.snapshot_cargas():
             if math.hypot(fx, fy) <= 1e-8:
                 continue
@@ -401,7 +431,7 @@ def figura_plano(armadura, origen=None):
                 text=[str(nudo) for nudo, _x, _y in nodos],
                 textposition="top center",
                 marker={
-                    "size": 18,
+                    "size": 22,
                     "color": colores,
                     "line": {"width": 2, "color": "#0B1F3A"},
                 },
@@ -409,38 +439,138 @@ def figura_plano(armadura, origen=None):
                 hovertemplate="nudo %{text}<br>x=%{x:.2f} m<br>y=%{y:.2f} m<extra></extra>",
             )
         )
-    if nodos:
-        xs = [x for _nudo, x, _y in nodos]
-        ys = [y for _nudo, _x, y in nodos]
-        margen = 1.6
-        rango_x = [min(xs) - margen, max(xs) + margen]
-        rango_y = [min(ys) - margen, max(ys) + margen]
-    else:
-        rango_x = [0, 8]
-        rango_y = [0, 6]
+    x0, x1, y0, y1 = limites_malla(filas)
+    holgura = 0.35
     figura.update_layout(
         title="Plano de la armadura",
         xaxis_title="x (m)",
         yaxis_title="y (m)",
-        xaxis={"range": rango_x, "constrain": "domain"},
+        xaxis={"range": [x0 - holgura, x1 + holgura], "constrain": "domain"},
         yaxis={
-            "range": rango_y,
+            "range": [y0 - holgura, y1 + holgura],
             "scaleanchor": "x",
             "scaleratio": 1,
             "constrain": "domain",
         },
-        clickmode="event+select",
-        dragmode="pan",
         legend={"orientation": "h", "y": -0.15},
         margin={"l": 40, "r": 20, "t": 48, "b": 40},
         paper_bgcolor="white",
         plot_bgcolor="#F7F5F0",
         height=560,
-        uirevision="plano-propia-encuadre",
+        uirevision=f"malla-{x0}-{x1}-{y0}-{y1}",
     )
     figura.update_xaxes(gridcolor="#E2E0D8", zerolinecolor="#B7B3A8")
     figura.update_yaxes(gridcolor="#E2E0D8", zerolinecolor="#B7B3A8")
     return figura
+
+
+def _tamano_simbolo(nodos):
+    if len(nodos) < 2:
+        return 0.42
+    xs = [x for _nudo, x, _y in nodos]
+    ys = [y for _nudo, _x, y in nodos]
+    span = max(max(xs) - min(xs), max(ys) - min(ys), 1.0)
+    return max(0.45, min(0.72, 0.12 * span))
+
+
+def _dibujar_apoyo(figura, x, y, tipo, tam):
+    """Triángulo de apoyo, suelo o pared, en coordenadas del plano."""
+    oro = "#C9A227"
+    borde = "#0B1F3A"
+    if tipo == "movil_pared":
+        figura.add_shape(
+            type="path",
+            path=(
+                f"M {x + 0.28 * tam} {y} "
+                f"L {x + 1.15 * tam} {y - 0.62 * tam} "
+                f"L {x + 1.15 * tam} {y + 0.62 * tam} Z"
+            ),
+            fillcolor=oro,
+            line={"color": borde, "width": 1.5},
+        )
+        radio = 0.22 * tam
+        for signo in (-1, 1):
+            cx = x + 1.42 * tam
+            cy = y + signo * 0.32 * tam
+            figura.add_shape(
+                type="circle",
+                x0=cx - radio,
+                y0=cy - radio,
+                x1=cx + radio,
+                y1=cy + radio,
+                fillcolor="white",
+                line={"color": borde, "width": 1.4},
+            )
+        muro = x + 1.72 * tam
+        figura.add_shape(
+            type="line",
+            x0=muro,
+            y0=y - 1.05 * tam,
+            x1=muro,
+            y1=y + 1.05 * tam,
+            line={"color": borde, "width": 2.4},
+        )
+        figura.add_annotation(
+            x=muro,
+            y=y - 1.35 * tam,
+            text="pared",
+            showarrow=False,
+            bgcolor="white",
+            font={"size": 12, "color": borde},
+        )
+        return
+    punta = y - 0.28 * tam
+    base = y - 1.25 * tam
+    figura.add_shape(
+        type="path",
+        path=f"M {x} {punta} L {x - 0.78 * tam} {base} L {x + 0.78 * tam} {base} Z",
+        fillcolor=oro,
+        line={"color": borde, "width": 1.5},
+    )
+    figura.add_shape(
+        type="line",
+        x0=x - 1.05 * tam,
+        y0=base,
+        x1=x + 1.05 * tam,
+        y1=base,
+        line={"color": borde, "width": 2.4},
+    )
+    if tipo == "movil":
+        radio = 0.22 * tam
+        for signo in (-1, 1):
+            cx = x + signo * 0.36 * tam
+            cy = base - radio
+            figura.add_shape(
+                type="circle",
+                x0=cx - radio,
+                y0=cy - radio,
+                x1=cx + radio,
+                y1=cy + radio,
+                fillcolor="white",
+                line={"color": borde, "width": 1.4},
+            )
+        etiqueta = "piso"
+        y_etiq = base - 0.62 * tam
+    else:
+        for dx in (-0.72, -0.36, 0.0, 0.36, 0.72):
+            figura.add_shape(
+                type="line",
+                x0=x + dx * tam,
+                y0=base,
+                x1=x + dx * tam - 0.22 * tam,
+                y1=base - 0.28 * tam,
+                line={"color": borde, "width": 1.5},
+            )
+        etiqueta = "fijo"
+        y_etiq = base - 0.5 * tam
+    figura.add_annotation(
+        x=x,
+        y=y_etiq,
+        text=etiqueta,
+        showarrow=False,
+        bgcolor="white",
+        font={"size": 12, "color": borde},
+    )
 
 
 def _xy(armadura, nudo):

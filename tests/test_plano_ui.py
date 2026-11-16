@@ -127,7 +127,42 @@ def test_la_cuadrilla_no_crea_una_barra():
     assert resultado["barras"] == []
 
 
-def test_clasificar_y_firma():
+def test_la_malla_crece_en_las_cuatro_direcciones():
+    from plano_ui import limites_malla, puntos_malla
+
+    vacia = limites_malla([])
+    assert vacia[0] < 0 and vacia[2] < 0
+    un_nudo = limites_malla([{"nudo": 0, "x (m)": 1, "y (m)": 1}])
+    assert un_nudo[0] <= 1 - 4 and un_nudo[1] >= 1 + 4
+    assert un_nudo[2] <= 1 - 4 and un_nudo[3] >= 1 + 4
+    lejos = limites_malla(
+        [
+            {"nudo": 0, "x (m)": 0, "y (m)": 0},
+            {"nudo": 1, "x (m)": 20, "y (m)": -12},
+        ]
+    )
+    assert lejos[0] <= -4
+    assert lejos[1] >= 24
+    assert lejos[2] <= -16
+    assert lejos[3] >= 4
+    xs, ys = puntos_malla([{"nudo": 1, "x (m)": 20, "y (m)": -12}])
+    assert (24.0, -16.0) in set(zip(xs, ys))
+
+
+def test_elige_el_otro_extremo_aunque_el_primero_siga_marcado():
+    from plano_ui import elegir_punto
+
+    puntos = [
+        {"customdata": "nudo:0", "x": 0, "y": 0},
+        {"customdata": "nudo:1", "x": 4, "y": 0},
+    ]
+    elegido = elegir_punto(puntos, "Barra", origen=0)
+    assert elegido["customdata"] == "nudo:1"
+    assert elegir_punto(
+        [{"customdata": "rejilla", "x": 1, "y": 1}, {"customdata": "nudo:2", "x": 2, "y": 2}],
+        "Apoyo",
+        None,
+    )["customdata"] == "nudo:2"
     assert clasificar_punto("nudo:4") == ("nudo", 4)
     assert clasificar_punto(["rejilla"]) == ("rejilla", None)
     firma = firma_seleccion(

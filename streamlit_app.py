@@ -27,7 +27,7 @@ import streamlit as st
 
 try:
     from armadura_2d_andresdperezc import Armadura2D
-    from plano_ui import efecto_clic, figura_plano, firma_seleccion, leer_punto
+    from plano_ui import efecto_clic, elegir_punto, figura_plano, firma_seleccion, leer_puntos
 except ImportError:
     raise SystemExit(
         "No se encontró la librería 'armadura_2d_andresdperezc'.\n"
@@ -699,7 +699,11 @@ def _plano_interactivo(
     except ValueError as exc:
         vista, avisos = None, [str(exc)]
     try:
-        figura = figura_plano(vista, st.session_state.get("barra_origen"))
+        figura = figura_plano(
+            vista,
+            st.session_state.get("barra_origen"),
+            recibir_nudos=(modo == "Nudo"),
+        )
     except ImportError:
         st.error("Falta Plotly. Con el entorno activo: python -m pip install plotly")
         return
@@ -707,7 +711,7 @@ def _plano_interactivo(
         figura,
         on_select="rerun",
         selection_mode="points",
-        key="plano_interaccion",
+        key=f"plano_interaccion_{st.session_state.get('plano_version', 0)}",
         theme=None,
         width="stretch",
         config={"displaylogo": False},
@@ -742,12 +746,20 @@ def _aplicar_clic_plano(
     tipo_movil,
     filas_carga,
 ):
-    punto = leer_punto(estado)
+    punto = elegir_punto(
+        leer_puntos(estado),
+        modo,
+        st.session_state.get("barra_origen"),
+    )
     firma = firma_seleccion(punto, modo, horizontal, vertical_abajo, apoyo_codigo)
     if st.session_state.get("modo_plano_prev") != modo:
         st.session_state.modo_plano_prev = modo
-        st.session_state.barra_origen = None
-        st.session_state.clic_aplicado = firma
+        if st.session_state.get("modo_plano_prev_listo"):
+            st.session_state.barra_origen = None
+            st.session_state.plano_aviso = ""
+            st.session_state.plano_version = st.session_state.get("plano_version", 0) + 1
+            st.rerun()
+        st.session_state.modo_plano_prev_listo = True
         return
     if not punto or firma == st.session_state.get("clic_aplicado"):
         if st.session_state.get("plano_aviso"):
@@ -769,14 +781,13 @@ def _aplicar_clic_plano(
         vertical_abajo,
         apoyo_codigo,
     )
-    st.session_state.clic_aplicado = firma
     st.session_state.plano_aviso = resultado["aviso"]
     st.session_state.barra_origen = resultado["origen"]
-    if resultado["aviso"]:
-        st.caption(resultado["aviso"])
+    st.session_state.plano_version = st.session_state.get("plano_version", 0) + 1
+    st.session_state.clic_aplicado = None
     if resultado["cambio"]:
         _guardar_tablas(resultado)
-        st.rerun()
+    st.rerun()
 
 
 def _longitudes(armadura):
