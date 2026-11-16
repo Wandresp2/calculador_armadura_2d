@@ -86,8 +86,10 @@ El triángulo de libro (base 4 m, altura 3 m, 50 kN hacia abajo en la cúspide) 
 | Método | Resultado |
 |---|---|
 | `preset_triangulo()` / `preset_warren()` / `preset_pratt()` / `preset_howe()` | Armadura lista para `resolver()` |
-| `agregar_nodo` / `agregar_barra` / `agregar_apoyo` / `agregar_carga` | Construcción libre (librería; la GUI 0.1.0 no la expone) |
-| `definir_apoyos(fijo, movil)` | Exactamente un pin y un rodillo vertical |
+| `agregar_nodo` / `agregar_barra` / `agregar_apoyo` / `agregar_carga` | Construcción libre. La GUI también la expone en el modo Propia |
+| `definir_apoyos(fijo, movil, tipo_movil="movil")` | Un pin y un rodillo: `movil` (piso, Ry) o `movil_pared` (pared, Rx) |
+| `ecuaciones()` | Sistema ΣFx = 0 y ΣFy = 0 de cada nudo, sin sustituir la solución |
+| `graficar_nudo(nudo, resultado)` | Cuerpo libre de un nudo |
 | `definir_cargas([(nudo, fx, fy), ...])` | Sustituye el conjunto de cargas |
 | `reemplazar_coordenadas({id: (x, y), ...})` | Mueve todos los nudos a la vez |
 | `longitud(barra)` / `angulo(barra)` | `L` en m y ángulo en radianes |
@@ -118,7 +120,7 @@ Si la armadura no es isostática (`m + r = 2j`) o `A` es singular, se lanza `Val
 | Pratt | 6 nudos; diagonales hacia el centro | igual | **tensión** (`3-1`, `5-1`) |
 | Howe | mismas cuerdas; diagonales hacia los apoyos | igual | **compresión** (`4-0`, `4-2`) |
 
-La GUI solo ofrece estos cuatro; se pueden editar coordenadas, apoyos y cargas, **no** añadir ni quitar barras.
+La GUI ofrece estos cuatro y, además, una armadura propia: nudos, barras, cargas y apoyos.
 
 ## Ejemplos (sin Streamlit)
 
@@ -145,7 +147,7 @@ python -m pip install -e ".[gui]"
 streamlit run streamlit_app.py
 ```
 
-Abra http://localhost:8501. Radio de presets, sliders de base/altura, tablas de nudos y cargas. La GUI convierte “vertical hacia abajo (+)” a `Fy` negativa; no arma la matriz `A`.
+Abra http://localhost:8501. La página se lee de arriba hacia abajo: qué hace el programa, datos (precargada o propia), figura con fuerzas y reacciones, tablas y el sistema completo de ecuaciones con el cuerpo libre de cada nudo. La GUI convierte “vertical hacia abajo (+)” a `Fy` negativa; las ecuaciones salen de `ecuaciones()`, no se reescriben en la interfaz.
 
 ## Docker
 
@@ -182,14 +184,14 @@ Solo se instala `src/armadura_2d_andresdperezc/`. `streamlit_app.py`, tests, doc
 
 - Solo **2D** e **isostáticas**. Hiperestática, mecanismo o `A` singular → `ValueError`.
 - Cargas solo en nudos. Sin peso propio ni carga distribuida en la barra.
-- Apoyos: un fijo (Rx, Ry) y un móvil vertical (Ry). Sin empotramiento ni rodillo inclinado.
+- Apoyos: un fijo (Rx, Ry) y un móvil. El móvil puede estar en un piso (solo Ry) o en una pared vertical (solo Rx). Sin empotramiento ni rodillo inclinado.
 - Sin pórticos, momento flector, 3D, diámetro, esfuerzo `σ = N/A`, pandeo ni códigos NSR/AISC.
-- La GUI no dibuja armaduras arbitrarias: solo los cuatro presets, misma topología.
+- La armadura propia se arma con tablas (nudos, barras, cargas y apoyos), no con un lienzo de dibujo.
 - Unidades fijas kN y m.
 
 Si el desarrollo se **expande**, hay que **volver a validarlo**.
 
-**Futuro** (no es deuda de esta versión): (1) diseñar / dibujar cualquier armadura en la aplicación y correr el mismo `resolver()` — la librería ya tiene `agregar_*`; (2) diámetro o sección por barra y `σ = N/A` como postproceso, sin cambiar `A x = b`.
+**Futuro** (no está en esta versión): diámetro o sección por barra y `σ = N/A` como postproceso, sin cambiar `A x = b`. Dibujar la armadura sobre un lienzo, en lugar de tablas, tampoco está.
 
 ## Autor
 

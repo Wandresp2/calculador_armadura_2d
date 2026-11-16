@@ -303,3 +303,118 @@ def test_definir_cargas_sustituye_conjunto():
     armadura.definir_cargas([(2, 0.0, -20.0)])
     rec = _reacciones(armadura.resolver())
     assert rec[0].ry == pytest.approx(10.0)
+
+
+def _armadura_rodillo_pared():
+    """Pin en (0, 0), rodillo de pared en (0, 3), carga de 50 kN en (4, 0)."""
+    armadura = Armadura2D(nombre="pared")
+    armadura.agregar_nodo(0, 0.0, 0.0)
+    armadura.agregar_nodo(1, 0.0, 3.0)
+    armadura.agregar_nodo(2, 4.0, 0.0)
+    armadura.agregar_barra("B1", 0, 1)
+    armadura.agregar_barra("B2", 0, 2)
+    armadura.agregar_barra("B3", 1, 2)
+    armadura.agregar_apoyo(0, "fijo")
+    armadura.agregar_apoyo(1, "movil_pared")
+    armadura.agregar_carga(2, fy=-50.0)
+    return armadura
+
+
+def test_rodillo_en_pared_reacciones_y_barras():
+    resultado = _armadura_rodillo_pared().resolver()
+    barras = _fuerzas(resultado)
+    rec = _reacciones(resultado)
+    assert barras["B1"].fuerza == pytest.approx(-50.0)
+    assert barras["B1"].tipo == "compresion"
+    assert barras["B2"].fuerza == pytest.approx(-200.0 / 3.0)
+    assert barras["B3"].fuerza == pytest.approx(250.0 / 3.0)
+    assert barras["B3"].tipo == "tension"
+    assert rec[0].rx == pytest.approx(200.0 / 3.0)
+    assert rec[0].ry == pytest.approx(50.0)
+    assert rec[1].rx == pytest.approx(-200.0 / 3.0)
+    assert rec[1].ry == pytest.approx(0.0)
+    assert resultado.equilibrio.ok
+
+
+def test_rodillo_pared_a_la_altura_del_fijo_es_singular():
+    armadura = Armadura2D.preset_triangulo()
+    armadura.definir_apoyos(0, 1, "movil_pared")
+    with pytest.raises(ValueError, match="rodillo de pared"):
+        armadura.resolver()
+
+
+def test_definir_apoyos_rechaza_movil_inclinado():
+    armadura = Armadura2D.preset_triangulo()
+    with pytest.raises(ValueError, match="movil_pared"):
+        armadura.definir_apoyos(0, 1, "inclinado")
+
+
+def test_ecuaciones_del_triangulo_incluyen_la_carga():
+    from armadura_2d_andresdperezc import SistemaEcuaciones
+
+    sistema = Armadura2D.preset_triangulo().ecuaciones()
+    assert isinstance(sistema, SistemaEcuaciones)
+    assert sistema.incognitas == ("N_B1", "N_B2", "N_B3", "Rx_0", "Ry_0", "Ry_1")
+    assert len(sistema.ecuaciones) == 6
+    fy_cuspide = next(
+        eq for eq in sistema.ecuaciones if eq.nudo == 2 and eq.eje == "y"
+    )
+    assert fy_cuspide.carga == pytest.approx(-50.0)
+    assert "N_B2" in fy_cuspide.texto
+    assert "N_B3" in fy_cuspide.texto
+    assert "50" in fy_cuspide.texto
+    assert fy_cuspide.texto.endswith("= 0")
+
+
+def test_graficar_nudo_devuelve_figura():
+    armadura = Armadura2D.preset_triangulo()
+    resultado = armadura.resolver()
+    figura = armadura.graficar_nudo(2, resultado)
+    assert isinstance(figura, Figure)
+    assert "2" in figura.axes[0].get_title()
+    with pytest.raises(ValueError, match="No existe el nudo"):
+        armadura.graficar_nudo(9)
+
+
+def test_problema_beer_6_1_coincide_con_el_libro():
+    """Misma álgebra que el problema resuelto 6.1 (lb y ft, unidades coherentes)."""
+    armadura = Armadura2D(nombre="beer-6.1")
+    for nudo, x, y in (
+        (0, 0.0, 8.0),
+        (1, 12.0, 8.0),
+        (2, 24.0, 8.0),
+        (3, 6.0, 0.0),
+        (4, 18.0, 0.0),
+    ):
+        armadura.agregar_nodo(nudo, x, y)
+    for barra, i, j in (
+        ("AB", 0, 1),
+        ("BC", 1, 2),
+        ("AD", 0, 3),
+        ("DB", 3, 1),
+        ("DE", 3, 4),
+        ("BE", 1, 4),
+        ("EC", 4, 2),
+    ):
+        armadura.agregar_barra(barra, i, j)
+    armadura.agregar_apoyo(2, "fijo")
+    armadura.agregar_apoyo(4, "movil")
+    armadura.agregar_carga(0, fy=-2000.0)
+    armadura.agregar_carga(1, fy=-1000.0)
+    resultado = armadura.resolver()
+    barras = _fuerzas(resultado)
+    rec = _reacciones(resultado)
+    assert barras["AB"].fuerza == pytest.approx(1500.0)
+    assert barras["AD"].fuerza == pytest.approx(-2500.0)
+    assert barras["DB"].fuerza == pytest.approx(2500.0)
+    assert barras["DE"].fuerza == pytest.approx(-3000.0)
+    assert barras["BE"].fuerza == pytest.approx(-3750.0)
+    assert barras["BC"].fuerza == pytest.approx(5250.0)
+    assert barras["EC"].fuerza == pytest.approx(-8750.0)
+    assert rec[2].rx == pytest.approx(0.0)
+    assert rec[2].ry == pytest.approx(-7000.0)
+    assert rec[4].ry == pytest.approx(10000.0)
+    assert resultado.equilibrio.ok
+    fy_a = next(eq for eq in armadura.ecuaciones().ecuaciones if eq.nudo == 0 and eq.eje == "y")
+    assert "N_AD" in fy_a.texto
+    assert "2000" in fy_a.texto

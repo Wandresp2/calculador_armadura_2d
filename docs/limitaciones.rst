@@ -9,13 +9,13 @@ Alcance de la 0.1.0
   → ``ValueError``.
 - Cargas **solo en nudos**. Sin peso propio ni carga distribuida en la
   barra.
-- Apoyos: un **fijo** (Rx, Ry) y un **móvil vertical** (Ry). Sin
-  empotramiento ni rodillo inclinado.
+- Apoyos: un **fijo** (Rx, Ry) y un **móvil**. El móvil está en un
+  piso (solo Ry) o en una pared vertical (solo Rx). Sin empotramiento
+  ni rodillo inclinado.
 - Sin pórticos, ni momento flector en barras, ni 3D.
 - Sin diámetro, esfuerzo :math:`\sigma = N/A`, pandeo de Euler ni
   códigos NSR/AISC.
-- La GUI no dibuja armaduras arbitrarias: solo los cuatro presets,
-  editando números y la misma topología.
+- La armadura propia se arma con tablas. No hay lienzo para dibujarla.
 - Unidades fijas **kN** y **m**.
 
 Si el desarrollo se **expande**, hay que **volver a validarlo** (tests +
@@ -24,10 +24,8 @@ esta página).
 Futuro (no es deuda de la 0.1.0)
 --------------------------------
 
-1. **Diseñar / dibujar cualquier armadura** en la aplicación (lienzo o
-   tablas de topología: añadir y quitar nudos y barras) y correr el
-   mismo ``resolver()``. La librería ya tiene ``agregar_*``; faltará la
-   UI.
+1. **Dibujar la armadura en un lienzo** (la propia ya se arma con
+   tablas y usa el mismo ``resolver()``).
 2. **Esfuerzo y más variables:** diámetro (o sección) por barra,
    :math:`\sigma = N/A`, quizá material o pandeo. Eso **no** cambia
    :math:`A x = b` de la estática; es postproceso o un modelo más rico.

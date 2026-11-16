@@ -34,3 +34,11 @@ Resultados
 .. autoclass:: armadura_2d_andresdperezc.ResultadoArmadura
    :members:
    :undoc-members:
+
+.. autoclass:: armadura_2d_andresdperezc.EcuacionNudo
+   :members:
+   :undoc-members:
+
+.. autoclass:: armadura_2d_andresdperezc.SistemaEcuaciones
+   :members:
+   :undoc-members:

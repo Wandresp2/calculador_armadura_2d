@@ -15,9 +15,11 @@ Uso rápido::
 from .core import (
     Armadura2D,
     ChequeoEquilibrio,
+    EcuacionNudo,
     FuerzaBarra,
     Reaccion,
     ResultadoArmadura,
+    SistemaEcuaciones,
 )
 
 __version__ = "0.1.0"
@@ -25,8 +27,10 @@ __version__ = "0.1.0"
 __all__ = [
     "Armadura2D",
     "ChequeoEquilibrio",
+    "EcuacionNudo",
     "FuerzaBarra",
     "Reaccion",
     "ResultadoArmadura",
+    "SistemaEcuaciones",
     "__version__",
 ]

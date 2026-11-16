@@ -25,7 +25,7 @@ Caso de libro (triángulo)
 -------------------------
 
 Base 4 m, altura 3 m, 50 kN hacia abajo en la cúspide
-(:math:`F_y = -50` kN). Fijo en el nudo 0, móvil vertical en el nudo 1.
+(:math:`F_y = -50` kN). Fijo en el nudo 0, móvil de piso en el nudo 1.
 
 .. math::
 
@@ -68,13 +68,17 @@ Quien instala por pip puede armar cualquier isostática 2D::
 Edición de números (misma topología)::
 
    a.reemplazar_coordenadas({0: (0, 0), 1: (8, 0), 2: (4, 6)})
-   a.definir_apoyos(0, 1)
+   a.definir_apoyos(0, 1)                 # piso: solo Ry
+   a.definir_apoyos(0, 1, "movil_pared")  # pared vertical: solo Rx
    a.definir_cargas([(2, 0.0, -20.0)])
    print(a.longitud("B1"), a.angulo("B1"))
+   print(a.ecuaciones().texto)
 
-La GUI 0.1.0 **no** expone un diseñador vacío: solo los cuatro presets,
-editando coordenadas, apoyos y cargas. Añadir o quitar barras queda para
-un futuro CAD.
+``movil_pared`` aporta Rx. Si ese rodillo queda a la misma altura que
+el apoyo fijo, el sistema es singular.
+
+La GUI ofrece los cuatro presets y una armadura propia (tablas de
+nudos y barras). ``graficar_nudo`` dibuja el cuerpo libre de un nudo.
 
 Gráficos
 --------

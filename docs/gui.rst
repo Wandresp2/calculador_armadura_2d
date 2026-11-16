@@ -13,19 +13,21 @@ Streamlit (local)
    python -m pip install -e ".[gui]"
    streamlit run streamlit_app.py
 
-Abra http://localhost:8501. Controles:
+Abra http://localhost:8501. La página se lee de arriba hacia abajo:
 
-- radio **Triángulo / Warren / Pratt / Howe** (misma topología; no se
-  pueden añadir ni quitar barras)
-- sliders de **base** (1–20 m) y **altura** (0,5–10 m)
-- tablas de nudos, apoyos y cargas
-- longitudes :math:`L` calculadas (solo lectura)
-- figura tensión / compresión, residuos :math:`\sum F_x`,
-  :math:`\sum F_y`, :math:`\sum M` y tablas de :math:`N` y reacciones
+1. Qué hace el programa.
+2. Datos: armadura **precargada** (Triángulo, Warren, Pratt, Howe, con
+   base, altura, nudos, apoyos y cargas) o **propia** (tablas para
+   agregar y quitar nudos y barras).
+3. Figura con color, fuerza en cada barra, cargas y reacciones.
+4. Tablas de resultados.
+5. Sistema completo de ecuaciones y cuerpo libre de cada nudo
+   (``ecuaciones()`` y ``graficar_nudo()``).
 
-La GUI convierte “vertical hacia abajo (+)” a :math:`F_y` negativa
-antes de llamar a la librería. No arma la matriz :math:`A` ni duplica
-fórmulas.
+El apoyo móvil puede ser de **piso** (solo Ry) o de **pared vertical**
+(solo Rx). La GUI convierte “vertical hacia abajo (+)” a
+:math:`F_y` negativa antes de llamar a la librería. No arma la matriz
+:math:`A` ni duplica fórmulas.
 
 Docker
 ------
