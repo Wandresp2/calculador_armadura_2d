@@ -4,7 +4,7 @@
 
 Léelo junto con `ARQUITECTURA_REPLICABLE.md` (receta de empaquetado copiada de Bohr: `src/`, PyPI, Sphinx, Streamlit, Docker **sin EC2**). No copies física de Bohr ni secciones de EC2.
 
-**Estado:** diseño cerrado. Fases 0 a 3 hechas. Fases 4 a 10 pendientes.
+**Estado:** diseño cerrado. Fases 0 a 10 hechas. Queda publicar (usuario).
 
 **Autor del paquete:** Andrés David Pérez Criollo  
 **Correo:** adperezc@udistrital.edu.co  
@@ -112,16 +112,16 @@ No reabrir salvo pedido explícito del usuario.
 | 4 | Nombre de import | `armadura_2d_andresdperezc` |
 | 5 | Clase principal | `Armadura2D` |
 | 6 | Idioma | Español en todo |
-| 7 | Alcance mecánico | 2D, barras de dos fuerzas, cargas **solo en nudos**, apoyos **fijo** (\(R_x, R_y\)) y **móvil vertical** (solo \(R_y\)). Solo **isostáticas** (\(m + r = 2j\) y \(A\) invertible). |
+| 7 | Alcance mecánico | 2D, barras de dos fuerzas, cargas **solo en nudos**, un apoyo **fijo** (\(R_x, R_y\)) y un **móvil**: piso (solo \(R_y\), tipo ``movil``) o pared vertical (solo \(R_x\), tipo ``movil_pared``). Solo **isostáticas** (\(m + r = 2j\) y \(A\) invertible). |
 | 8 | Unidades 0.1.0 | Fuerzas en **kN**, coordenadas y longitudes en **m**. Eje: origen abajo-izquierda, **y positivo hacia arriba**. |
 | 9 | Diámetro / esfuerzo | **Fuera de 0.1.0.** Documentado como futuro. No bloquear `resolver()` por falta de diámetro. |
 | 10 | Signo de fuerzas internas | **Positivo = tensión**, negativo = compresión. Barra de fuerza ≈ 0 → tipo `nula`. |
 | 11 | \(\sum M = 0\) | No es una fila extra por nudo (fuerzas concurrentes). Es **verificación global** (y por nudo, residuo numérico) vía `verificar_equilibrio()`. El solver es \(A x = b\) por nudos. |
-| 12 | Catálogo GUI | Cuatro presets: **Triángulo · Warren · Pratt · Howe**. No hay modo “armadura vacía” ni lienzo para dibujar. |
-| 13 | Edición 0.1.0 | **Misma topología.** Se editan coordenadas, sliders de base/altura, cargas en nudos existentes y cuál nudo es fijo / móvil. No añadir ni quitar nudos o barras. |
+| 12 | Catálogo GUI | Cuatro presets: **Triángulo · Warren · Pratt · Howe**, más modo **Propia** por tablas (nudos, barras, cargas, apoyos). No hay lienzo para dibujar. |
+| 13 | Edición | En precargada, misma topología (coordenadas, base/altura, cargas, apoyos). En propia se añaden y quitan nudos y barras. Sigue habiendo exactamente un fijo y un móvil. |
 | 14 | Longitud | **Calculada** a partir de coordenadas. El usuario no escribe \(L\). Sliders globales (base, altura) + tabla \((x, y)\). |
 | 15 | Carga en Streamlit | Campos “horizontal (→ +)” y “vertical **hacia abajo** (+)”. 50 kN abajo → el paquete recibe \(F_y = -50\). La API de la librería usa ejes matemáticos (\(F_y > 0\) hacia arriba). |
-| 16 | Pedagogía GUI | Figura T/C + tabla de resultados + **residuos** \(\sum F_x\), \(\sum F_y\), \(\sum M \approx 0\). **No** mostrar matriz \(A\) ni vectores \(x\), \(b\) ni ecuaciones escritas nudo a nudo. Eso puede ir en notebook/Sphinx. |
+| 16 | Pedagogía GUI | Figura con color y valores, tablas, residuos y el **sistema completo** ΣFx = 0 y ΣFy = 0 (`ecuaciones()`), con el cuerpo libre de cada nudo (`graficar_nudo`). La GUI no reescribe las fórmulas. |
 | 17 | Gráficos | `Armadura2D.graficar()` en la librería; **matplotlib es dependencia de runtime** del paquete. |
 | 18 | Solver | `numpy.linalg.solve`. |
 | 19 | Python | ≥ 3.10. Imagen Docker: `python:3.12-slim`. |
@@ -377,6 +377,15 @@ theta = a.angulo("B1")             # radianes; documentar. Grados solo si se eti
 r = a.resolver()                   # ResultadoArmadura
 eq = a.verificar_equilibrio(r)
 fig = a.graficar(r)                # matplotlib.figure.Figure
+
+# Lectura para la GUI (sin tocar _nodos / _barras):
+a.snapshot_nodos()                 # [(id, x, y), ...]
+a.snapshot_barras()                # [(id, i, j), ...]
+a.snapshot_apoyos()                # [(nudo, "fijo"|"movil"), ...]
+a.snapshot_cargas()                # [(nudo, fx, fy), ...]  fy ya en ejes (abajo = negativo)
+a.definir_apoyos(fijo, movil)
+a.definir_cargas([(nudo, fx, fy), ...])
+a.reemplazar_coordenadas({id: (x, y), ...})  # todas a la vez (evita L=0 intermedio)
 ```
 
 Construcción libre (`agregar_*`) **sí va en la librería** (quien instala por pip puede armar cualquier isostática). La **GUI 0.1.0 no expone** un diseñador vacío: solo presets editables. El futuro “dibujar cualquiera” reutilizará `agregar_*`.
@@ -394,7 +403,7 @@ Campos mínimos sugeridos:
 - `ChequeoEquilibrio`: sum_fx, sum_fy, sum_mz, ok (bool), residuos por nudo si es práctico.
 - `ResultadoArmadura`: fuerzas (lista), reacciones (lista), equilibrio, y opcionalmente el vector \(x\) **no** se pinta en Streamlit.
 
-Estado interno: nudos, barras, apoyos y cargas como estructuras privadas (`self._nodos`, etc.). Coordenadas editables mediante métodos claros (`mover_nodo`, `escalar`, `reemplazar_carga`, `definir_apoyos`) para que Streamlit no mutile atributos privados.
+Estado interno: nudos, barras, apoyos y cargas como estructuras privadas (`self._nodos`, etc.). Coordenadas y cargas se editan con `reemplazar_coordenadas`, `definir_cargas` y `definir_apoyos`. Streamlit no lee ni escribe atributos privados.
 
 ### 6.3 `graficar(resultado)`
 
@@ -421,29 +430,29 @@ Cubrir:
 7. `ValueError`: nudo repetido, barra a nudo inexistente, \(L=0\), barra duplicada, hiperestática (p. ej. segundo fijo o barra extra), hipostática (quitar un apoyo), tipo de apoyo ilegal, carga en nudo inexistente.
 8. `graficar` devuelve `Figure`.
 9. Presets existen y se pueden `resolver()` sin GUI.
+10. `snapshot_*`, `reemplazar_coordenadas` (todas las coords o `ValueError`) y `definir_cargas`.
 
-No hace falta Selenium/Playwright.
+No hace falta Selenium/Playwright. 37 tests en verde al cerrar la fase 6.
 
 ---
 
 ## 8. GUI Streamlit (`streamlit_app.py`)
 
-Fuera de `src/`. Única importación de dominio: el paquete.
+Fuera de `src/`. Única importación de dominio: el paquete. Extra `[gui]`. **Hecha** (fase 6).
 
-Flujo:
+Flujo (como quedó tras el ajuste de páginas):
 
-1. `selectbox`: Triángulo / Warren / Pratt / Howe. Al cambiar de preset, se cargan valores por defecto (se puede avisar que se descartan ediciones).
-2. Sliders **base** y **altura** (escalan el preset).
-3. Tabla de nudos: id, \(x\), \(y\) (editables).
-4. Tabla de cargas: nudo, horizontal →+, vertical hacia abajo +. Convertir a \(F_x\), \(F_y\) antes de llamar a la librería.
-5. Apoyos: elegir nudo fijo y nudo móvil (distintos).
-6. Mostrar \(L\) de cada barra **calculada** (solo lectura).
-7. Llamar `resolver()`, `verificar_equilibrio()`, `graficar()`.
-8. Tabla de \(N\), tipo T/C/nula, reacciones, residuos.
-9. `ImportError` amigable: `pip install -e ".[gui]"`.
-10. `os.environ.setdefault("MPLBACKEND", "Agg")`.
+1. Barra superior: **Calculadora** y **Ecuaciones** (`st.navigation`, `position="top"`).
+2. En Calculadora, `st.radio`: Precargada / Propia. En precargada, otro radio: Triángulo / Warren / Pratt / Howe. Al cambiar de preset se recargan geometría, apoyos y cargas por defecto.
+3. Los dos modos usan la misma disposición: datos a la izquierda y plano a la derecha (`plano_ui.figura_plano`). En propia el plano crea nudos, barras, apoyos y cargas. En precargada el plano solo se mira: la topología del preset no cambia.
+4. Sliders **base** (1–20 m) y **altura** (0,5–10 m), tabla de nudos, apoyos y cargas siguen en la columna izquierda. `data_editor` puede devolver DataFrame; se normaliza a filas. La GUI convierte “abajo +” a \(F_y\) negativa **antes** de `definir_cargas`.
+5. Figura `graficar(resultado)` centrada y más angosta, **antes** del botón. Si la armadura todavía no cierra, ahí va el error.
+6. Botón **Calcular**. Recién entonces: residuos \(\sum F_x\), \(\sum F_y\), \(\sum M\), tablas de \(N\) / T/C / reacciones y longitudes. Si los datos cambian, esos resultados se ocultan hasta pulsar de nuevo.
+7. La página Ecuaciones muestra `ecuaciones()` y `graficar_nudo()` del último cálculo guardado en `st.session_state`.
+8. `ImportError` amigable: `pip install -e ".[gui]"`.
+9. `os.environ.setdefault("MPLBACKEND", "Agg")`.
 
-No recalcular senos ni armar \(A\) en este archivo.
+No recalcular senos ni armar \(A\) en este archivo. Acceso al modelo solo por `snapshot_*`, `reemplazar_coordenadas`, `definir_apoyos`, `definir_cargas`.
 
 ---
 
@@ -453,30 +462,31 @@ Seguir `ARQUITECTURA_REPLICABLE.md`. Estructura objetivo:
 
 ```text
 segundo_parcial/
-├── CONTEXTO_DESARROLLO.md          ← este archivo
-├── ARQUITECTURA_REPLICABLE.md      ← receta (ya existe)
+├── CONTEXTO_DESARROLLO.md          ← local; NO va a GitHub
+├── ARQUITECTURA_REPLICABLE.md      ← local; NO va a GitHub
 ├── pyproject.toml
 ├── README.md
 ├── LICENSE                         ← MIT
-├── PUBLICAR_PYPI.md
-├── DESPLIEGUE.md                   ← Docker Hub + Pages; SIN EC2
 ├── Dockerfile
 ├── .dockerignore
 ├── .gitignore
-├── streamlit_app.py
-├── ejemplo_consola.py
+├── .env.example                    ← sin secretos; .env no se versiona
+├── streamlit_app.py                ← GUI en la raíz (Docker / Streamlit)
+├── plano_ui.py
 ├── examples/
+│   ├── ejemplo_consola.py
 │   └── notebook_didactico.ipynb
 ├── src/
 │   └── armadura_2d_andresdperezc/
 │       ├── __init__.py
 │       └── core.py
 ├── tests/
-│   └── test_core.py
-├── docs/                           ← Sphinx (Furo, autodoc, napoleon, rinoh)
+│   ├── test_core.py
+│   └── test_plano_ui.py
+├── docs/                           ← Sphinx + guías PUBLICAR_PYPI / DESPLIEGUE
 └── .github/workflows/
     ├── pages.yml
-    └── tests.yml                   ← mejora: pytest en CI
+    └── tests.yml
 ```
 
 `[tool.setuptools.packages.find] where = ["src"]`.
@@ -536,10 +546,10 @@ Igual que la plantilla de `ARQUITECTURA_REPLICABLE.md`:
 
 - Base `python:3.12-slim`
 - `MPLBACKEND=Agg`, Streamlit headless, `0.0.0.0:8501`
-- Instala `".[gui]"`
-- `HEALTHCHECK` a `/_stcore/health`
+- Instala `".[gui]"` (Streamlit y Plotly)
+- Copia `streamlit_app.py` y `plano_ui.py` (la página). No copiar tests, docs, notebook ni `.venv`
 - Fuentes `fonts-dejavu-core`
-- No copiar tests, docs, notebook, `.venv`
+- `HEALTHCHECK` a `/_stcore/health`
 
 ```bash
 docker build -t andresperez3/armadura-2d-andresdperezc:0.1.0 .
@@ -582,8 +592,19 @@ Dejarlo escrito en README y `docs/limitaciones.rst` para no perderlo:
 
 1. **Diseñar / dibujar cualquier armadura** en la aplicación (lienzo o tablas de topología: añadir/quitar nudos y barras) y correr el mismo `resolver()`. La librería ya tendrá `agregar_*`; faltará la UI.
 2. **Esfuerzo y más variables:** diámetro (o sección) por barra, \(\sigma = N/A\), quizá material, pandeo u otras magnitudes de resistencia de materiales. Eso **no** cambia \(A x = b\) de la estática; es postproceso o un modelo más rico.
+3. **Pesos \(W\) y cuerdas** (pedido el 18 nov 2026). Documentado para hacerlo después. **No implementado:** ni en `core.py`, ni en la GUI, ni en Docker.
 
-No son deuda de la 0.1.0. No abrir issues de código ahora.
+   El usuario quiere, al crear la armadura, inputs nuevos además de las cargas: pesos \(W\) (no son la carga nodal de hoy) y cuerdas, que solo trabajan a tensión. El equilibrio debe seguir siendo \(A x = b\). Los resultados muestran lo configurado. Entra en la librería y, al hacerlo, se reconstruye la imagen Docker (`docker build`): la imagen copia `src/` y `streamlit_app.py`; no hay un cálculo aparte en el `Dockerfile`.
+
+   Camino que cabe en el solver actual:
+
+   - **Peso en un nudo:** \(W\) hacia abajo se suma al lado de las cargas al armar \(b\), y en resultados se lista aparte de las cargas.
+   - **Peso de una barra:** se reparte en partes iguales entre sus dos nudos. Así la barra sigue siendo de dos fuerzas. Un peso a mitad de la barra, o repartido a lo largo, queda fuera: esa barra deja de ser de dos fuerzas.
+   - **Cuerda:** sustituye a una barra o la armadura propia sigue cumpliendo \(m + r = 2j\). Agregarla encima de un preset que ya es isostático lo vuelve hiperestático y `resolver()` debe seguir rechazándolo.
+
+   Queda por cerrar con el usuario, antes de codificar: si una cuerda sale a compresión, el programa avisa y se detiene, o la quita y vuelve a resolver. Lo segundo ya no es una sola llamada a `numpy.linalg.solve`. Con \(W = 0\) y sin cuerdas, el triángulo de libro y los signos de Pratt y Howe no pueden cambiar.
+
+No son deuda de la 0.1.0. No abrir issues de código ahora. El punto 3 tampoco se codifica hasta que el usuario lo pida en una sesión.
 
 ---
 
@@ -597,13 +618,15 @@ Trabajar **una fase por vez**. Al cerrar: actualizar esta tabla.
 | 1 | Esqueleto instalable | **Hecha** | `pyproject.toml`, `LICENSE`, `.gitignore`, `src/.../__init__.py`, `core.py` mínimo, README corto | `pip install -e .` e `import armadura_2d_andresdperezc` |
 | 2 | Dominio + tests triángulo | **Hecha** | Construcción, \(A x = b\), T/C, reacciones, `verificar_equilibrio`, validaciones, tests de libro | `pytest -v` verde con la tabla 5.1 |
 | 3 | Presets Warren / Pratt / Howe | **Hecha** | `preset_*`, tests de isostática, residuos ≈ 0, signos Pratt vs Howe | Los cuatro presets `resolver()` sin GUI |
-| 4 | Gráficos | Pendiente | `graficar()` + test de `Figure` | Figura sin Streamlit |
-| 5 | Ejemplos | Pendiente | `ejemplo_consola.py` + `examples/notebook_didactico.ipynb` | Uso sin GUI |
-| 6 | Streamlit | Pendiente | Selector, sliders, tablas, conversión de carga “abajo +”, residuos, figura | `streamlit run streamlit_app.py` |
-| 7 | Sphinx + PDF | Pendiente | `docs/`, docstrings, workflow Pages | HTML local + rinoh; limitaciones y futuro |
-| 8 | Docker | Pendiente | `Dockerfile`, `.dockerignore` | `docker build` + `run -p 8501:8501` abre la GUI |
-| 9 | Guías | Pendiente | `PUBLICAR_PYPI.md`, `DESPLIEGUE.md` **sin EC2**, CI pytest | El usuario puede subir sin adivinar |
-| 10 | README completo | Pendiente | Cara pública del repo y de PyPI | Alguien ajeno instala y usa |
+| 4 | Gráficos | **Hecha** | `graficar()` + test de `Figure` | Figura sin Streamlit |
+| 5 | Ejemplos | **Hecha** | `ejemplo_consola.py` + `examples/notebook_didactico.ipynb` | Uso sin GUI |
+| 6 | Streamlit | **Hecha** | `streamlit_app.py` + snapshots en `core.py` | `streamlit run streamlit_app.py`; triángulo de libro y Pratt/Howe con T/C correctos |
+| 7 | Sphinx + PDF | **Hecha** | `docs/`, autodoc, `.github/workflows/pages.yml` | HTML Furo + PDF rinohtype; limitaciones y futuro |
+| 8 | Docker | **Hecha** | `Dockerfile`, `.dockerignore` | `docker build` + `run -p 8501:8501`; HEALTHCHECK ok; triángulo de libro |
+| 9 | Guías | **Hecha** | `PUBLICAR_PYPI.md`, `DESPLIEGUE.md`, `.github/workflows/tests.yml` | `twine check` PASSED; el usuario puede subir sin adivinar |
+| 10 | README completo | **Hecha** | Cara pública del repo y de PyPI | Alguien ajeno instala y usa; `twine check` PASSED |
+| 11 | Lectura, armadura propia y rodillo en pared | **Hecha** | GUI en una sola página; modo Propia; `movil_pared`; `ecuaciones()` y `graficar_nudo()`; test del problema 6.1 | `pytest -v` verde y la página muestra figura, resultados y el sistema |
+| 12 | Calculadora en dos páginas | **Hecha** | Datos a la izquierda y plano a la derecha también en precargada; figura centrada antes de **Calcular**; ecuaciones en otra página | `pytest -v` verde; en :8501 el triángulo de libro sale tras Calcular y las ecuaciones no comparten esa página |
 
 **Fuera de fases (usuario):** crear GitHub, Pages, `docker push`, TestPyPI, PyPI. Pegar URLs cuando existan.
 
@@ -639,7 +662,104 @@ pytest -v
 pytest -v
 ```
 
-28 tests en verde. Los cuatro presets resuelven; Pratt: diagonales `3-1` y `5-1` a tracción; Howe: `4-0` y `4-2` a compresión. `graficar` sigue en `NotImplementedError`.
+28 tests de solver/presets en verde (fase 3). Pratt: diagonales a tracción; Howe: a compresión.
+
+### Cómo verificar la fase 4
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pytest -v
+```
+
+35 tests en verde. `graficar()` devuelve `matplotlib.figure.Figure` (backend Agg) en los cuatro presets.
+
+### Cómo verificar la fase 5
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python examples/ejemplo_consola.py
+```
+
+Imprime el triángulo de libro, Pratt y Howe (T/C y reacciones) y guarda PNG en `examples/` (gitignorados). El notebook `examples/notebook_didactico.ipynb` no usa Streamlit; kernel = `.venv`.
+
+### Cómo verificar la fase 6
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[gui]"
+pytest -v
+streamlit run streamlit_app.py
+```
+
+37 tests en verde. En el navegador (http://127.0.0.1:8501):
+
+- Triángulo 4×3 m, 50 kN en cúspide: B1 \(=+50/3\) kN (tensión), B2 y B3 \(=-(25/3)\sqrt{13}\) kN (compresión), Ry = 25 kN, equilibrio sí.
+- Pratt: diagonales 3–1 y 5–1 a **tensión**.
+- Howe: diagonales 4–0 y 4–2 a **compresión**.
+- Cambiar radio recarga geometría; sliders cambian base/altura del preset.
+
+### Cómo verificar la fase 7
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[docs]"
+sphinx-build -b html docs docs/_build/html
+sphinx-build -b rinoh docs docs/_build/rinoh
+```
+
+Abra `docs/_build/html/index.html`. El PDF queda en `docs/_build/rinoh/armadura-2d-andresdperezc.pdf`. Páginas: instalación, uso, API, GUI, limitaciones (futuro CAD/esfuerzo), publicar. Workflow: `.github/workflows/pages.yml` (el usuario activa Pages en GitHub). 37 tests siguen en verde.
+
+### Cómo verificar la fase 8
+
+```powershell
+docker build -t andresperez3/armadura-2d-andresdperezc:0.1.0 .
+docker run --rm -p 8501:8501 andresperez3/armadura-2d-andresdperezc:0.1.0
+```
+
+Abra http://localhost:8501. HEALTHCHECK: `http://127.0.0.1:8501/_stcore/health` responde `ok`. El triángulo de libro debe coincidir con la GUI local (B1 16.6667 kN tensión, B2/B3 −30.0463 kN). `docker push` lo hace el usuario.
+
+### Cómo verificar la fase 9
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install build twine
+Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+python -m build
+python -m twine check dist/*
+```
+
+`twine check` debe decir **PASSED** en el `.whl` y el `.tar.gz`. El wheel solo contiene `src/armadura_2d_andresdperezc/` (no `streamlit_app.py`). Guías: `PUBLICAR_PYPI.md` y `DESPLIEGUE.md` (Docker Hub + Pages). CI: `.github/workflows/tests.yml` (pytest en 3.10 y 3.12). Las subidas las hace el usuario; no hay tokens en el repo.
+
+### Cómo verificar la fase 10
+
+El `README.md` cubre propósito, pip vs import, GUI fuera del paquete, extras, uso, métodos, unidades, presets, tests, Streamlit, Docker, Sphinx, `PUBLICAR_PYPI.md`, limitaciones, futuro y autor. Tabla Windows/Linux/macOS **sin** fila de máquina en la nube. Tras editarlo:
+
+```powershell
+python -m build
+python -m twine check dist/*
+```
+
+sigue en **PASSED**.
+
+### Cómo verificar la fase 11
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pytest -v
+streamlit run streamlit_app.py
+```
+
+43 tests en verde, incluido el problema 6.1 de Beer (1500 lb, 2500 lb, …) y el rodillo en pared. En http://127.0.0.1:8501 la página va de la explicación a los datos, la figura, los resultados y el sistema de ecuaciones. Hay que **reiniciar** Streamlit si ya estaba abierto: el proceso no recarga solo `core.py`.
+
+### Cómo verificar la fase 12
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pytest -v
+streamlit run streamlit_app.py
+```
+
+En http://127.0.0.1:8501 la barra superior tiene Calculadora y Ecuaciones. En Calculadora, precargada y propia muestran datos a la izquierda y plano a la derecha. La figura de la armadura queda centrada, antes del botón. Tras **Calcular**, el triángulo de libro sigue dando B1 \(=+50/3\) kN y Ry = 25 kN. Las ecuaciones no aparecen en esa página: están en Ecuaciones, y se vacían si los datos cambian.
 
 ---
 
@@ -664,9 +784,9 @@ pytest -v
 - [x] `pyproject.toml` con `where = ["src"]`
 - [x] Versión igual en toml y `__init__.py`
 - [ ] Nombre PyPI libre el día de publicar
-- [x] LICENSE MIT y README (README corto de fase 1; completo en fase 10)
-- [ ] `python -m build` + `twine check` PASSED
-- [ ] Guía TestPyPI → PyPI
+- [x] LICENSE MIT y README completo (cara de PyPI)
+- [x] `python -m build` + `twine check` PASSED
+- [x] Guía TestPyPI → PyPI
 
 ### POO / calidad
 
@@ -674,23 +794,23 @@ pytest -v
 - [x] Validaciones `ValueError` (nudo, barra, apoyos, isostática, sistema singular)
 - [x] Docstrings NumPy/Google en la API de fase 2
 - [x] `pytest -v` en verde (triángulo de libro + Warren/Pratt/Howe + errores)
-- [ ] GUI no duplica lógica
+- [x] GUI no duplica lógica
 
 ### GUI / Docker
 
-- [ ] `streamlit_app.py` fuera de `src/`
-- [ ] Extra `[gui]`
-- [ ] Cuatro presets editables (misma topología)
-- [ ] Dockerfile `0.0.0.0:8501`, Agg, HEALTHCHECK
-- [ ] `.dockerignore`
-- [ ] **Ninguna** sección EC2
+- [x] `streamlit_app.py` fuera de `src/`
+- [x] Extra `[gui]`
+- [x] Cuatro presets editables (misma topología)
+- [x] Dockerfile `0.0.0.0:8501`, Agg, HEALTHCHECK
+- [x] `.dockerignore`
+- [x] **Ninguna** sección EC2 (`DESPLIEGUE.md` = Docker Hub + Pages)
 
 ### Docs / ejemplos
 
-- [ ] Sphinx + Furo + autodoc + rinoh
-- [ ] Pages workflow + CI pytest
-- [ ] Notebook y `ejemplo_consola.py`
-- [ ] Limitaciones, futuro (dibujar / esfuerzo) y compatibilidad SO
+- [x] Sphinx + Furo + autodoc + rinoh
+- [x] Pages workflow + CI pytest (`.github/workflows/pages.yml` y `tests.yml`)
+- [x] Notebook y `ejemplo_consola.py`
+- [x] Limitaciones, futuro (dibujar / esfuerzo) y compatibilidad SO (`docs/limitaciones.rst`)
 
 ---
 
@@ -702,18 +822,26 @@ pytest -v
 4. GUI: solo catálogo de presets, misma topología, sliders base/altura + coordenadas; \(L\) calculada; carga “abajo +” en la GUI.
 5. Catálogo: Triángulo (4×3 m, 50 kN en cúspide) + Warren + Pratt + Howe (puentes 4×2 m, 2 paneles, 50 kN en centro inferior).
 6. Autor, correo y Docker Hub iguales a Bohr. pip `armadura-2d-andresdperezc`.
-7. Futuro escrito: dibujar cualquier armadura; esfuerzo/diámetro.
+7. Futuro escrito: dibujar cualquier armadura; esfuerzo/diámetro. El 18 nov 2026 se añadió, solo en la documentación, pesos \(W\) y cuerdas (mismo \(A x = b\); no codificado).
 8. Fase 0 = este archivo.
 9. Fase 1 = esqueleto instalable (`pip install -e .`, import `Armadura2D`).
 10. Fase 2 = `A x = b`, T/C, `preset_triangulo`, tests de libro.
-11. Fase 3 = `preset_warren`, `preset_pratt`, `preset_howe` (28 tests). `graficar` pendiente.
+11. Fase 3 = `preset_warren`, `preset_pratt`, `preset_howe`.
+12. Fase 4 = `graficar()` → `Figure`.
+13. Fase 5 = `ejemplo_consola.py` + notebook (sin Streamlit).
+14. Fase 6 = `streamlit_app.py` (radio de presets, sliders, tablas, `st.pyplot`). La GUI solo usa API pública (`snapshot_*`, `reemplazar_coordenadas`, `definir_cargas`).
+15. Fase 7 = Sphinx (Furo, autodoc, napoleon) + PDF rinohtype + `pages.yml`.
+16. Fase 8 = `Dockerfile` + `.dockerignore` (imagen `andresperez3/armadura-2d-andresdperezc:0.1.0`, puerto 8501).
+17. Fase 9 = `PUBLICAR_PYPI.md`, `DESPLIEGUE.md` (Docker Hub + Pages) y CI `tests.yml`. `twine check` PASSED.
+18. Fase 10 = README completo (cara de PyPI). No hay más fases de código.
 
 ---
 
-## 18. Pendiente del usuario (no bloquea la fase 4)
+## 18. Pendiente del usuario (publicación)
 
 - Crear el repositorio GitHub y pasar la URL.
+- Activar Pages: *Settings → Pages → Source: GitHub Actions*.
 - El día de publicar, confirmar que `armadura-2d-andresdperezc` sigue libre en PyPI.
-- Subidas: TestPyPI, PyPI, Docker Hub, Pages.
+- Subidas: TestPyPI, PyPI, Docker Hub (`docker push`), Pages.
 
-Siguiente implementación cuando el usuario la pida: **fase 4** (`graficar()`).
+Fase 11 (lectura de la GUI, armadura propia, rodillo en pared, sistema de ecuaciones) quedó hecha después del cierre 0–10. Las subidas las hace el usuario (`PUBLICAR_PYPI.md`, `DESPLIEGUE.md`).

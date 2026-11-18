@@ -13,6 +13,18 @@ La GUI de Streamlit **no** forma parte del paquete: vive en este repositorio (`s
 
 Versión **0.1.0**. Python **≥ 3.10**. Licencia **MIT**.
 
+## Formas de acceso
+
+| Qué quiere | Cómo | Qué obtiene |
+|---|---|---|
+| Usar la **librería** | `pip install armadura-2d-andresdperezc` | Cálculos y gráficos matplotlib. **Sin** GUI. |
+| Abrir la **calculadora** (con Python) | Clonar este repo y `streamlit run streamlit_app.py` | GUI en http://localhost:8501 |
+| Abrir la **calculadora** (sin instalar Python) | `docker pull` + `docker run` (puerto 8501) | La misma GUI en el navegador |
+| Leer la **documentación** | [GitHub Pages](https://wandresp2.github.io/calculador_armadura_2d/) | HTML estático (Sphinx). **No** hospeda Streamlit. |
+
+Repo: [Wandresp2/calculador_armadura_2d](https://github.com/Wandresp2/calculador_armadura_2d).
+Imagen: `andresperez3/armadura-2d-andresdperezc:0.1.0`.
+
 ## Requisitos y sistemas
 
 Corre en **Windows, Linux y macOS** (Python 3.10 o superior).
@@ -144,6 +156,10 @@ Los tests contrastan el triángulo de libro, isostática y residuos ≈ 0 en los
 La interfaz **no se publica en PyPI**. Hay que clonar este repositorio:
 
 ```powershell
+git clone https://github.com/Wandresp2/calculador_armadura_2d.git
+cd calculador_armadura_2d
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[gui]"
 streamlit run streamlit_app.py
 ```
@@ -152,16 +168,25 @@ Abra http://localhost:8501. Arriba están las páginas Calculadora y Ecuaciones.
 
 ## Docker
 
-Cualquier sistema con Docker abre la misma GUI en el navegador (no usa Tkinter). Streamlit escucha en `0.0.0.0:8501`.
+Cualquier sistema con Docker abre la misma GUI en el navegador (no usa Tkinter). No hace falta clonar el repo ni instalar Python. Streamlit escucha en `0.0.0.0:8501`.
+
+Desde [Docker Hub](https://hub.docker.com/r/andresperez3/armadura-2d-andresdperezc):
+
+```bash
+docker pull andresperez3/armadura-2d-andresdperezc:0.1.0
+docker run --rm -p 8501:8501 andresperez3/armadura-2d-andresdperezc:0.1.0
+```
+
+http://localhost:8501
+
+Para construirla en local (hace falta el código del repo):
 
 ```bash
 docker build -t andresperez3/armadura-2d-andresdperezc:0.1.0 .
 docker run --rm -p 8501:8501 andresperez3/armadura-2d-andresdperezc:0.1.0
 ```
 
-http://localhost:8501
-
-El `docker push` a Docker Hub (usuario `andresperez3`) y GitHub Pages: [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
+El `docker push` y GitHub Pages: [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
 
 ## Documentación (Sphinx)
 
@@ -173,7 +198,7 @@ sphinx-build -b rinoh docs docs/_build/rinoh
 
 HTML: `docs/_build/html/index.html`. PDF: `docs/_build/rinoh/armadura-2d-andresdperezc.pdf`.
 
-GitHub Pages: *Settings → Pages → GitHub Actions* (flujo en `.github/workflows/pages.yml`).
+Documentación publicada: [wandresp2.github.io/calculador_armadura_2d](https://wandresp2.github.io/calculador_armadura_2d/). Flujo: `.github/workflows/pages.yml`.
 
 ## Publicar en PyPI (lo hace el autor)
 
