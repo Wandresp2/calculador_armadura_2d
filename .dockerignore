@@ -22,4 +22,5 @@ ARQUITECTURA_REPLICABLE.md
 .pypirc
 *.pem
 .cursor/
+.vscode/
 agent-transcripts/

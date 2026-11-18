@@ -1,8 +1,8 @@
 Construir HTML, PDF y GitHub Pages
 ==================================
 
-Los comandos de **PyPI y Docker Hub** están en la raíz del
-repositorio (no se copian aquí para no duplicar versiones):
+Los comandos de **PyPI y Docker Hub** están en esta carpeta (no se
+copian aquí para no duplicar versiones):
 
 * ``PUBLICAR_PYPI.md`` — ensayo en TestPyPI y luego PyPI. Solo se
   publica ``src/armadura_2d_andresdperezc/``.

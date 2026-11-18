@@ -1,10 +1,10 @@
 # Publicar la librería en PyPI — paso a paso
 
-Solo se instala la **lógica** (`src/armadura_2d_andresdperezc/`). El wheel no lleva `streamlit_app.py`, `ejemplo_consola.py`, `docs/`, `Dockerfile` ni el notebook: `pyproject.toml` busca paquetes únicamente dentro de `src/`. El sdist (`.tar.gz`) puede incluir `tests/` (habitual para que se puedan correr al bajar el fuente).
+Solo se instala la **lógica** (`src/armadura_2d_andresdperezc/`). El wheel no lleva `streamlit_app.py`, `examples/`, `docs/`, `Dockerfile` ni el notebook: `pyproject.toml` busca paquetes únicamente dentro de `src/`. El sdist (`.tar.gz`) puede incluir `tests/` (habitual para que se puedan correr al bajar el fuente).
 
 Las subidas (TestPyPI y PyPI) las hace el autor. Esta guía no pide tokens en el chat.
 
-Docker Hub y GitHub Pages: ver `DESPLIEGUE.md`.
+Docker Hub y GitHub Pages: ver [DESPLIEGUE.md](DESPLIEGUE.md).
 
 ## 0. Estructura que debe tener el proyecto
 
@@ -19,7 +19,9 @@ segundo_parcial/
 │       └── core.py
 ├── tests/test_core.py
 ├── streamlit_app.py        ← NO se publica
-└── ejemplo_consola.py      ← NO se publica
+├── plano_ui.py             ← NO se publica
+├── examples/               ← NO se publica
+└── docs/                   ← guías y Sphinx; NO van en el wheel
 ```
 
 Nombre PyPI (con **guion**) ≠ nombre de import (con **guion bajo**):
@@ -50,7 +52,7 @@ Si el comando `python` no está en el PATH (Windows), use el launcher `py`.
 
 ```powershell
 pytest -v
-python ejemplo_consola.py
+python examples/ejemplo_consola.py
 ```
 
 ## 3. Construir los distribuibles

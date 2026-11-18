@@ -127,7 +127,7 @@ La GUI ofrece estos cuatro y, además, una armadura propia. Se arma con las tabl
 
 Demuestran que el paquete funciona **solo con pip**:
 
-- `python ejemplo_consola.py` — triángulo de libro, Pratt y Howe; PNG en `examples/`.
+- `python examples/ejemplo_consola.py` — triángulo de libro, Pratt y Howe; PNG en `examples/`.
 - `examples/notebook_didactico.ipynb` — teoría breve y llamadas a la librería (Jupyter; kernel del `.venv`).
 
 ## Pruebas
@@ -161,7 +161,7 @@ docker run --rm -p 8501:8501 andresperez3/armadura-2d-andresdperezc:0.1.0
 
 http://localhost:8501
 
-El `docker push` a Docker Hub (usuario `andresperez3`) y GitHub Pages: [`DESPLIEGUE.md`](DESPLIEGUE.md).
+El `docker push` a Docker Hub (usuario `andresperez3`) y GitHub Pages: [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
 
 ## Documentación (Sphinx)
 
@@ -177,7 +177,7 @@ GitHub Pages: *Settings → Pages → GitHub Actions* (flujo en `.github/workflo
 
 ## Publicar en PyPI (lo hace el autor)
 
-Paso a paso, primero TestPyPI y luego PyPI: [`PUBLICAR_PYPI.md`](PUBLICAR_PYPI.md).
+Paso a paso, primero TestPyPI y luego PyPI: [`docs/PUBLICAR_PYPI.md`](docs/PUBLICAR_PYPI.md).
 
 Solo se instala `src/armadura_2d_andresdperezc/`. `streamlit_app.py`, `plano_ui.py`, tests, docs, Docker y el notebook quedan fuera del wheel. La imagen de Docker sí copia esos dos archivos de la interfaz, porque ahí se abre la misma página.
 

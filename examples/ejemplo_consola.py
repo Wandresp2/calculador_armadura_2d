@@ -8,7 +8,7 @@ Preparación (una vez, desde la carpeta del proyecto)::
 
 Ejecutar::
 
-    python ejemplo_consola.py
+    python examples/ejemplo_consola.py
 """
 
 from pathlib import Path
@@ -63,7 +63,7 @@ def main():
     _imprimir(howe)
     print("  En Howe las diagonales hacia los apoyos van a compresión.")
 
-    carpeta = Path(__file__).resolve().parent / "examples"
+    carpeta = Path(__file__).resolve().parent
     carpeta.mkdir(exist_ok=True)
     for armadura, resultado, nombre in (
         (triangulo, resultado_t, "triangulo.png"),

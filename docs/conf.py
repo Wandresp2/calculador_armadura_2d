@@ -20,7 +20,13 @@ extensions = [
     "myst_parser",
 ]
 
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "PUBLICAR_PYPI.md",
+    "DESPLIEGUE.md",
+]
 
 autodoc_member_order = "bysource"
 autodoc_typehints = "description"

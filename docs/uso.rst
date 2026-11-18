@@ -98,8 +98,8 @@ Docker use el backend ``Agg``.
 Ejemplos del repositorio
 ------------------------
 
-- ``python ejemplo_consola.py`` — imprime el triángulo de libro, Pratt y
-  Howe, y guarda PNG en ``examples/``.
+- ``python examples/ejemplo_consola.py`` — imprime el triángulo de libro,
+  Pratt y Howe, y guarda PNG en ``examples/``.
 - ``examples/notebook_didactico.ipynb`` — teoría breve y llamadas a la
   API.
 

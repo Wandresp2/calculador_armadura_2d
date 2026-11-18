@@ -93,6 +93,6 @@ Python 3.10 y 3.12). No publican nada.
 ## 3. Orden recomendado el día de la entrega
 
 1. `pytest -v`
-2. TestPyPI → PyPI (`PUBLICAR_PYPI.md`)
+2. TestPyPI → PyPI ([PUBLICAR_PYPI.md](PUBLICAR_PYPI.md))
 3. `docker push` a `andresperez3`
 4. GitHub + Pages (*Settings → Pages → GitHub Actions*)

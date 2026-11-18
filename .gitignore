@@ -1,5 +1,11 @@
+# Secretos y entorno
 .venv/
 venv/
+.env
+.pypirc
+*.pem
+
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -9,8 +15,23 @@ build/
 .ipynb_checkpoints/
 .mypy_cache/
 *.log
+
+# Sphinx
 docs/_build/
+
+# Figuras que genera el ejemplo de consola
 examples/*.png
-.env
-.pypirc
-*.pem
+
+# Documentación interna (decisiones, receta, pendientes): no va a GitHub
+CONTEXTO_DESARROLLO.md
+ARQUITECTURA_REPLICABLE.md
+
+# IDE
+.cursor/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
+
+CONTEXTO_DESARROLLO.md
+ARQUITECTURA_REPLICABLE.md
