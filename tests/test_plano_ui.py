@@ -149,6 +149,22 @@ def test_la_malla_crece_en_las_cuatro_direcciones():
     assert (24.0, -16.0) in set(zip(xs, ys))
 
 
+def test_el_encuadre_de_lectura_no_abre_la_malla_de_cuatro_metros():
+    from plano_ui import limites_encuadre
+
+    x0, x1, y0, y1 = limites_encuadre(
+        [
+            {"nudo": 0, "x (m)": 0, "y (m)": 0},
+            {"nudo": 1, "x (m)": 4, "y (m)": 0},
+            {"nudo": 2, "x (m)": 2, "y (m)": 3},
+        ]
+    )
+    assert -4 < x0 < 0
+    assert 4 < x1 < 8
+    assert -4 < y0 < 0
+    assert 3 < y1 < 7
+
+
 def test_elige_el_otro_extremo_aunque_el_primero_siga_marcado():
     from plano_ui import elegir_punto
 

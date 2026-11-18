@@ -298,6 +298,21 @@ def _fmt(valor):
     return f"{numero:.1f}"
 
 
+def limites_encuadre(nodos):
+    """Límites justos para mirar la armadura, sin hueco para seguir dibujando.
+
+    Deja sitio para el apoyo, que se dibuja debajo del nudo, y para la
+    flecha de la carga. No abre los cuatro metros de la cuadrícula.
+    """
+    xs = [_real(fila.get("x (m)")) for fila in nodos if _entero(fila.get("nudo")) is not None]
+    ys = [_real(fila.get("y (m)")) for fila in nodos if _entero(fila.get("nudo")) is not None]
+    if not xs:
+        return limites_malla(nodos)
+    span = max(max(xs) - min(xs), max(ys) - min(ys), 1.0)
+    margen = max(1.8, 0.35 * span)
+    return (min(xs) - margen, max(xs) + margen, min(ys) - margen, max(ys) + margen)
+
+
 def limites_malla(nodos):
     """Rectángulo de la cuadrícula, en múltiplos de 0,5 m.
 
@@ -439,7 +454,10 @@ def figura_plano(armadura, origen=None, recibir_nudos=True):
                 hovertemplate="nudo %{text}<br>x=%{x:.2f} m<br>y=%{y:.2f} m<extra></extra>",
             )
         )
-    x0, x1, y0, y1 = limites_malla(filas)
+    if recibir_nudos:
+        x0, x1, y0, y1 = limites_malla(filas)
+    else:
+        x0, x1, y0, y1 = limites_encuadre(filas)
     holgura = 0.35
     figura.update_layout(
         title="Plano de la armadura",

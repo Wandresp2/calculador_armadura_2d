@@ -148,7 +148,7 @@ python -m pip install -e ".[gui]"
 streamlit run streamlit_app.py
 ```
 
-Abra http://localhost:8501. La página se lee de arriba hacia abajo: qué hace el programa, datos (precargada o propia), figura con fuerzas y reacciones, tablas y el sistema completo de ecuaciones con el cuerpo libre de cada nudo. La GUI convierte “vertical hacia abajo (+)” a `Fy` negativa; las ecuaciones salen de `ecuaciones()`, no se reescriben en la interfaz.
+Abra http://localhost:8501. Arriba están las páginas Calculadora y Ecuaciones. En la calculadora, los datos quedan a la izquierda y el plano a la derecha, tanto en una armadura precargada como en una propia. La figura con fuerzas y reacciones va centrada, antes del botón Calcular. Ese botón abre el equilibrio y las tablas. Las ecuaciones y el cuerpo libre de cada nudo están en la otra página. La GUI convierte “vertical hacia abajo (+)” a `Fy` negativa; las ecuaciones salen de `ecuaciones()`, no se reescriben en la interfaz.
 
 ## Docker
 

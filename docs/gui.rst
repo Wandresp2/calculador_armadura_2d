@@ -13,20 +13,28 @@ Streamlit (local)
    python -m pip install -e ".[gui]"
    streamlit run streamlit_app.py
 
-Abra http://localhost:8501. La página se lee de arriba hacia abajo:
+Abra http://localhost:8501. Arriba hay dos páginas: **Calculadora**
+y **Ecuaciones**.
+
+En Calculadora:
 
 1. Qué hace el programa.
-2. Datos: armadura **precargada** (Triángulo, Warren, Pratt, Howe, con
-   base, altura, nudos, apoyos y cargas) o **propia** (tablas para
-   agregar y quitar nudos y barras). En la propia, el plano de al lado
-   también crea elementos: nudo en la cuadrícula de 0,5 m (crece 4 m
-   alrededor de los nudos), barra entre dos nudos, apoyo o carga sobre
-   un nudo. Ese plano está en ``plano_ui.py`` y no entra al paquete de
-   PyPI.
-3. Figura con color, fuerza en cada barra, cargas y reacciones.
-4. Tablas de resultados.
-5. Sistema completo de ecuaciones y cuerpo libre de cada nudo
-   (``ecuaciones()`` y ``graficar_nudo()``).
+2. Datos, con la misma disposición en los dos modos: números a la
+   izquierda y plano a la derecha. La **precargada** (Triángulo, Warren,
+   Pratt, Howe) se edita con base, altura, nudos, apoyos y cargas; el
+   plano solo muestra esa geometría, porque las barras no se agregan ni
+   se quitan. La **propia** usa las mismas tablas y, en el plano, se
+   crean elementos: nudo en la cuadrícula de 0,5 m (crece 4 m alrededor
+   de los nudos), barra entre dos nudos, apoyo o carga sobre un nudo.
+   Ese plano está en ``plano_ui.py`` y no entra al paquete de PyPI.
+3. Figura de la armadura, más chica y centrada, con color, fuerza en
+   cada barra, cargas y reacciones. Aparece antes de calcular.
+4. Botón **Calcular**. Después salen el equilibrio, las tablas de
+   fuerzas y reacciones, y las longitudes.
+
+La página Ecuaciones muestra el sistema completo y el cuerpo libre de
+cada nudo (``ecuaciones()`` y ``graficar_nudo()``), con el último
+cálculo. Si los datos cambian, hay que pulsar Calcular otra vez.
 
 El apoyo móvil puede ser de **piso** (solo Ry) o de **pared vertical**
 (solo Rx). La GUI convierte “vertical hacia abajo (+)” a

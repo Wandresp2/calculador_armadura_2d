@@ -63,6 +63,38 @@ def _mostrar_figura(figura):
     plt.close(figura)
 
 
+def _mostrar_figura_centrada(figura):
+    """La figura de resultados, más chica y en el centro, no a todo el ancho."""
+    _izquierda, centro, _derecha = st.columns([1, 1.7, 1])
+    with centro:
+        st.pyplot(figura, clear_figure=True, width="stretch")
+    plt.close(figura)
+
+
+def _firma_valor(valor):
+    """Deja un número comparable aunque el editor devuelva int, float o NumPy."""
+    if hasattr(valor, "item"):
+        try:
+            valor = valor.item()
+        except (ValueError, AttributeError):
+            pass
+    if isinstance(valor, bool) or valor is None:
+        return valor
+    if isinstance(valor, (int, float)):
+        numero = float(valor)
+        if numero.is_integer():
+            return int(numero)
+        return round(numero, 6)
+    return valor
+
+
+def _firma_filas(filas, campos):
+    return tuple(
+        tuple(_firma_valor(fila.get(campo)) for campo in campos)
+        for fila in (filas or [])
+    )
+
+
 def _filas(editado):
     if hasattr(editado, "to_dict"):
         return editado.to_dict("records")
@@ -305,6 +337,30 @@ def _tabla_cargas(filas, clave, fija=True):
     )
 
 
+def _plano_lectura(armadura):
+    """El mismo plano de la armadura propia, sin agregar nudos a clic."""
+    st.subheader("Plano")
+    st.caption(
+        "Nudos, barras, apoyos y cargas, igual que al armar una armadura propia. "
+        "En una precargada las barras siguen uniendo los mismos nudos: "
+        "los cambios se hacen en los datos de la izquierda."
+    )
+    if armadura is None:
+        st.info("Corrige los datos para ver el plano.")
+        return
+    try:
+        figura = figura_plano(armadura, recibir_nudos=False)
+    except ImportError:
+        st.error("Falta Plotly. Con el entorno activo: python -m pip install plotly")
+        return
+    st.plotly_chart(
+        figura,
+        theme=None,
+        width="stretch",
+        config={"displaylogo": False},
+    )
+
+
 def _bloque_precargada():
     nombre = st.radio(
         "Armadura precargada",
@@ -314,71 +370,158 @@ def _bloque_precargada():
     prototipo = _fabrica(nombre)
     base_ref = float(prototipo.base_ref or 4.0)
     altura_ref = float(prototipo.altura_ref or 2.0)
+    memoria = st.session_state.setdefault("precargada_memoria", {})
     if st.session_state.get("preset_activo") != nombre:
         st.session_state.preset_activo = nombre
         st.session_state.base = base_ref
         st.session_state.altura = altura_ref
+    else:
+        # Al abrir Ecuaciones, Streamlit suelta las claves de los widgets
+        # que no están en esa página. La memoria las repone.
+        guardado = memoria.get(nombre) or {}
+        if "base" not in st.session_state:
+            st.session_state.base = float(guardado.get("base", base_ref))
+        if "altura" not in st.session_state:
+            st.session_state.altura = float(guardado.get("altura", altura_ref))
 
-    fila = st.columns(2)
-    with fila[0]:
-        base = st.slider(
-            "Base (m)",
-            min_value=BASE_MIN,
-            max_value=BASE_MAX,
-            step=0.1,
-            key="base",
+    col_form, col_plano = st.columns((1.15, 0.95), vertical_alignment="top")
+    with col_form:
+        fila = st.columns(2)
+        with fila[0]:
+            base = st.slider(
+                "Base (m)",
+                min_value=BASE_MIN,
+                max_value=BASE_MAX,
+                step=0.1,
+                key="base",
+            )
+        with fila[1]:
+            altura = st.slider(
+                "Altura (m)",
+                min_value=ALTURA_MIN,
+                max_value=ALTURA_MAX,
+                step=0.1,
+                key="altura",
+            )
+        st.caption(
+            "Los deslizadores escalan la armadura desde el origen. "
+            "La tabla de nudos afina cada posición. Las barras no cambian: "
+            "siguen uniendo los mismos nudos."
         )
-    with fila[1]:
-        altura = st.slider(
-            "Altura (m)",
-            min_value=ALTURA_MIN,
-            max_value=ALTURA_MAX,
-            step=0.1,
-            key="altura",
-        )
-    st.caption(
-        "Los deslizadores escalan la armadura desde el origen. "
-        "La tabla de nudos afina cada posición. Las barras no cambian: "
-        "siguen uniendo los mismos nudos."
-    )
 
-    ids = [nudo for nudo, _x, _y in prototipo.snapshot_nodos()]
-    coords_base = _coords_escaladas(nombre, base, altura)
-    filas_nodos = [
-        {"nudo": nudo, "x (m)": coords_base[nudo][0], "y (m)": coords_base[nudo][1]}
-        for nudo in ids
-    ]
-    st.subheader("Nudos")
-    nodos_edit = st.data_editor(
-        filas_nodos,
-        hide_index=True,
-        num_rows="fixed",
-        disabled=["nudo"],
-        key=f"nodos_{nombre}_{base}_{altura}",
-        column_config={
-            "nudo": st.column_config.NumberColumn(format="%d"),
-            "x (m)": st.column_config.NumberColumn(format="%.3f", step=0.1),
-            "y (m)": st.column_config.NumberColumn(format="%.3f", step=0.1),
-        },
-    )
-    fijo_def, movil_def, tipo_def = _apoyos_por_defecto(nombre)
-    nudo_fijo, nudo_movil, tipo_movil = _elegir_apoyos(
-        ids, fijo_def, movil_def, tipo_def, nombre
-    )
-    cargas_edit = _tabla_cargas(
-        _cargas_gui_por_defecto(nombre), f"cargas_{nombre}", fija=True
-    )
-    coords = {
-        int(fila["nudo"]): (float(fila["x (m)"]), float(fila["y (m)"]))
-        for fila in _filas(nodos_edit)
+        ids = [nudo for nudo, _x, _y in prototipo.snapshot_nodos()]
+        coords_base = _coords_escaladas(nombre, base, altura)
+        guardado = memoria.get(nombre) or {}
+        misma_escala = (
+            abs(float(guardado.get("base", -1)) - float(base)) < 1e-6
+            and abs(float(guardado.get("altura", -1)) - float(altura)) < 1e-6
+        )
+        filas_nodos = [
+            {"nudo": nudo, "x (m)": coords_base[nudo][0], "y (m)": coords_base[nudo][1]}
+            for nudo in ids
+        ]
+        if misma_escala and f"nodos_{nombre}_{base}_{altura}" not in st.session_state:
+            filas_nodos = guardado.get("nodos") or filas_nodos
+        st.subheader("Nudos")
+        nodos_edit = st.data_editor(
+            filas_nodos,
+            hide_index=True,
+            num_rows="fixed",
+            disabled=["nudo"],
+            key=f"nodos_{nombre}_{base}_{altura}",
+            column_config={
+                "nudo": st.column_config.NumberColumn(format="%d"),
+                "x (m)": st.column_config.NumberColumn(format="%.3f", step=0.1),
+                "y (m)": st.column_config.NumberColumn(format="%.3f", step=0.1),
+            },
+        )
+        fijo_def, movil_def, tipo_def = _apoyos_por_defecto(nombre)
+        if misma_escala:
+            if f"fijo_{nombre}" not in st.session_state and guardado.get("fijo") in ids:
+                fijo_def = guardado["fijo"]
+            if f"movil_{nombre}" not in st.session_state and guardado.get("movil") in ids:
+                movil_def = guardado["movil"]
+            if f"tipo_{nombre}" not in st.session_state and guardado.get("tipo"):
+                tipo_def = guardado["tipo"]
+        nudo_fijo, nudo_movil, tipo_movil = _elegir_apoyos(
+            ids, fijo_def, movil_def, tipo_def, nombre
+        )
+        filas_carga_inicial = _cargas_gui_por_defecto(nombre)
+        if f"cargas_{nombre}" not in st.session_state and guardado.get("cargas"):
+            filas_carga_inicial = guardado["cargas"]
+        cargas_edit = _tabla_cargas(
+            filas_carga_inicial, f"cargas_{nombre}", fija=True
+        )
+
+    filas_carga = _filas(cargas_edit)
+    memoria[nombre] = {
+        "base": base,
+        "altura": altura,
+        "nodos": _filas(nodos_edit),
+        "fijo": nudo_fijo,
+        "movil": nudo_movil,
+        "tipo": tipo_movil,
+        "cargas": filas_carga,
     }
     try:
+        coords = {
+            int(fila["nudo"]): (float(fila["x (m)"]), float(fila["y (m)"]))
+            for fila in _filas(nodos_edit)
+        }
+        error_coords = None
+    except (TypeError, ValueError):
+        coords = coords_base
+        error_coords = "Revisa las coordenadas: cada nudo necesita un número en x y en y."
+    firma = (
+        "Precargada",
+        nombre,
+        tuple(
+            sorted(
+                (
+                    _firma_valor(nudo),
+                    _firma_valor(xy[0]),
+                    _firma_valor(xy[1]),
+                )
+                for nudo, xy in coords.items()
+            )
+        ),
+        _firma_valor(nudo_fijo),
+        _firma_valor(nudo_movil),
+        tipo_movil,
+        _firma_filas(
+            filas_carga,
+            ("nudo", "horizontal →+ (kN)", "vertical hacia abajo (kN)"),
+        ),
+    )
+    if error_coords:
+        with col_plano:
+            _plano_lectura(None)
+        return None, None, error_coords, firma
+    barras = [
+        {"barra": barra, "nudo i": i, "nudo j": j}
+        for barra, i, j in prototipo.snapshot_barras()
+    ]
+    filas_nodos_plano = [
+        {"nudo": nudo, "x (m)": xy[0], "y (m)": xy[1]} for nudo, xy in coords.items()
+    ]
+    vista, _avisos = _vista_parcial(
+        filas_nodos_plano,
+        barras,
+        nudo_fijo,
+        nudo_movil,
+        tipo_movil,
+        filas_carga,
+    )
+    with col_plano:
+        _plano_lectura(vista)
+    try:
         armadura = _armar_preset(
-            nombre, coords, nudo_fijo, nudo_movil, tipo_movil, _filas(cargas_edit)
+            nombre, coords, nudo_fijo, nudo_movil, tipo_movil, filas_carga
         )
-        return _resolver(armadura)
+        armadura, resultado, error = _resolver(armadura)
+        return armadura, resultado, error, firma
     except ValueError as exc:
-        return None, None, str(exc)
+        return None, None, str(exc), firma
 
 
 def _asegurar_propia():
@@ -545,6 +688,8 @@ def _bloque_propia():
         )
         filas_nodos = _filas(nodos_edit)
         filas_barras = _filas(barras_edit)
+        st.session_state.nodos_fuente = filas_nodos
+        st.session_state.barras_fuente = filas_barras
         try:
             ids = []
             for fila in filas_nodos:
@@ -615,8 +760,20 @@ def _bloque_propia():
             cargas_plano,
         )
 
+    firma = (
+        "Propia",
+        _firma_filas(filas_nodos, ("nudo", "x (m)", "y (m)")),
+        _firma_filas(filas_barras, ("barra", "nudo i", "nudo j")),
+        _firma_valor(nudo_fijo),
+        _firma_valor(nudo_movil),
+        tipo_movil,
+        _firma_filas(
+            cargas_plano,
+            ("nudo", "horizontal →+ (kN)", "vertical hacia abajo (kN)"),
+        ),
+    )
     if error_ids or len(ids) < 2:
-        return None, None, error_ids
+        return None, None, error_ids, firma
     try:
         armadura = _armar_propia(
             filas_nodos,
@@ -626,9 +783,10 @@ def _bloque_propia():
             tipo_movil,
             _filas(cargas_edit),
         )
-        return _resolver(armadura)
+        armadura, resultado, error = _resolver(armadura)
+        return armadura, resultado, error, firma
     except ValueError as exc:
-        return None, None, str(exc)
+        return None, None, str(exc), firma
 
 
 def _plano_interactivo(
@@ -809,12 +967,23 @@ def _longitudes(armadura):
     )
 
 
-def _resultados(resultado):
+def _resultados(resultado, armadura):
     st.header("3. Resultados")
     st.markdown(
         "Positivo es **tensión** (la barra se estira). "
         "Negativo es **compresión** (la barra se acorta). "
         "En las reacciones, positivo es hacia la derecha y hacia arriba."
+    )
+    eq = resultado.equilibrio
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Equilibrio", "sí" if eq.ok else "revisar")
+    m2.metric("Σ Fx (kN)", f"{eq.sum_fx:.2e}")
+    m3.metric("Σ Fy (kN)", f"{eq.sum_fy:.2e}")
+    m4.metric("Σ M (kN·m)", f"{eq.sum_mz:.2e}")
+    st.caption(
+        "Esas tres sumas son el equilibrio de toda la armadura: "
+        "fuerzas horizontales, fuerzas verticales y momentos. "
+        "En una solución correcta quedan en cero."
     )
     st.subheader("Fuerzas en las barras")
     st.dataframe(
@@ -842,11 +1011,13 @@ def _resultados(resultado):
         ],
         hide_index=True,
     )
+    _longitudes(armadura)
+    st.caption("El sistema de ecuaciones de este cálculo está en la página Ecuaciones.")
 
 
 def _ecuaciones(armadura, resultado):
     sistema = armadura.ecuaciones()
-    st.header("4. Sistema de ecuaciones")
+    st.header("Sistema de ecuaciones")
     st.markdown(
         "Hay **dos ecuaciones por nudo**: la suma de fuerzas en x y la suma "
         "de fuerzas en y. El programa las escribe todas y las resuelve juntas."
@@ -893,22 +1064,30 @@ def _intro():
         "y las reacciones de los apoyos, de modo que la estructura quede en equilibrio."
     )
     st.markdown(
-        "Puedes partir de una armadura precargada o armar la tuya: "
-        "defines los nudos y sus distancias, las barras que los unen, "
-        "las cargas en los nudos y los dos apoyos. "
-        "Después ves la figura con los valores, la tabla de resultados "
-        "y el sistema de ecuaciones que produjo esos números."
+        "A la izquierda están los datos y a la derecha el plano, "
+        "tanto si partes de una armadura precargada como si armas la tuya. "
+        "La figura de abajo muestra tensión y compresión. "
+        "Cuando los datos estén listos, pulsa **Calcular** para ver las fuerzas, "
+        "las reacciones y el equilibrio. "
+        "El sistema de ecuaciones está en la página **Ecuaciones**."
     )
     st.caption("Unidades: kN y m. Hacia arriba es positivo. En las barras, + tensión y − compresión.")
 
 
-def main():
-    st.set_page_config(
-        page_title="Armaduras 2D",
-        page_icon="△",
-        layout="wide",
-        initial_sidebar_state="collapsed",
-    )
+def _boton_calcular():
+    _izquierda, centro, _derecha = st.columns([1.2, 1, 1.2])
+    with centro:
+        return st.button("Calcular", type="primary", width="stretch", key="btn_calcular")
+
+
+def _guardar_calculo(armadura, resultado, error, firma):
+    st.session_state.calc_armadura = armadura
+    st.session_state.calc_resultado = resultado
+    st.session_state.calc_error = error
+    st.session_state.firma_calculada = firma
+
+
+def pagina_calculadora():
     _intro()
     st.divider()
 
@@ -919,11 +1098,11 @@ def main():
         horizontal=True,
     )
     if modo == "Precargada":
-        armadura, resultado, error = _bloque_precargada()
+        armadura, resultado, error, firma = _bloque_precargada()
     else:
-        armadura, resultado, error = _bloque_propia()
+        armadura, resultado, error, firma = _bloque_propia()
 
-    _longitudes(armadura)
+    st.session_state.firma_actual = firma
     st.divider()
 
     st.header("2. Armadura")
@@ -935,28 +1114,63 @@ def main():
     if error:
         st.error(error)
     elif resultado is None:
-        st.info("Completa los datos para ver la armadura y el cálculo.")
+        st.info("Completa los datos para ver la armadura.")
     else:
-        _mostrar_figura(armadura.graficar(resultado))
-        eq = resultado.equilibrio
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Equilibrio", "sí" if eq.ok else "revisar")
-        m2.metric("Σ Fx (kN)", f"{eq.sum_fx:.2e}")
-        m3.metric("Σ Fy (kN)", f"{eq.sum_fy:.2e}")
-        m4.metric("Σ M (kN·m)", f"{eq.sum_mz:.2e}")
-        st.caption(
-            "Esas tres sumas son el equilibrio de toda la armadura: "
-            "fuerzas horizontales, fuerzas verticales y momentos. "
-            "En una solución correcta quedan en cero."
-        )
+        _mostrar_figura_centrada(armadura.graficar(resultado))
 
-    if resultado is None:
+    st.divider()
+    if _boton_calcular():
+        _guardar_calculo(armadura, resultado, error, firma)
+
+    if st.session_state.get("firma_calculada") is None:
+        st.caption("Pulsa Calcular para ver las fuerzas, las reacciones y el equilibrio.")
+        return
+    if st.session_state.get("firma_calculada") != firma:
+        st.info("Cambiaste los datos. Pulsa Calcular para actualizar los resultados.")
+        return
+    if error or resultado is None:
         return
 
     st.divider()
-    _resultados(resultado)
-    st.divider()
+    _resultados(resultado, armadura)
+
+
+def pagina_ecuaciones():
+    st.title("Ecuaciones")
+    st.caption("Unidades: kN y m. Hacia arriba es positivo. En las barras, + tensión y − compresión.")
+    if st.session_state.get("firma_calculada") is None:
+        st.info("Define la armadura en Calculadora y pulsa Calcular. El sistema aparece aquí.")
+        return
+    if st.session_state.get("firma_actual") != st.session_state.get("firma_calculada"):
+        st.warning(
+            "Los datos cambiaron desde el último cálculo. "
+            "Vuelve a Calculadora y pulsa Calcular."
+        )
+        return
+    error = st.session_state.get("calc_error")
+    armadura = st.session_state.get("calc_armadura")
+    resultado = st.session_state.get("calc_resultado")
+    if error or armadura is None or resultado is None:
+        st.error(error or "No hay un cálculo válido para escribir las ecuaciones.")
+        return
     _ecuaciones(armadura, resultado)
+
+
+def main():
+    st.set_page_config(
+        page_title="Armaduras 2D",
+        page_icon="△",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
+    navegacion = st.navigation(
+        [
+            st.Page(pagina_calculadora, title="Calculadora", default=True),
+            st.Page(pagina_ecuaciones, title="Ecuaciones"),
+        ],
+        position="top",
+    )
+    navegacion.run()
 
 
 main()
