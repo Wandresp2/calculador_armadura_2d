@@ -192,7 +192,7 @@ Solo se instala `src/armadura_2d_andresdperezc/`. `streamlit_app.py`, `plano_ui.
 
 Si el desarrollo se **expande**, hay que **volver a validarlo**.
 
-**Futuro** (no está en esta versión): diámetro o sección por barra y `σ = N/A` como postproceso, sin cambiar `A x = b`. Dibujar la armadura a mano alzada, sin la cuadrícula de 0,5 m, tampoco está.
+**Futuro** (no está en esta versión): diámetro o sección por barra y `σ = N/A` como postproceso, sin cambiar `A x = b`. Dibujar la armadura a mano alzada, sin la cuadrícula de 0,5 m, tampoco está. Tampoco hay pesos `W` ni cuerdas (elementos que solo trabajan a tensión): está anotado para una versión posterior, en la librería y en la imagen Docker, sin cambiar el equilibrio `A x = b`.
 
 ## Autor
 

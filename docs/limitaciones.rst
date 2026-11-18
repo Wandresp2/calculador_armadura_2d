@@ -31,6 +31,13 @@ Futuro (no es deuda de la 0.1.0)
 2. **Esfuerzo y más variables:** diámetro (o sección) por barra,
    :math:`\sigma = N/A`, quizá material o pandeo. Eso **no** cambia
    :math:`A x = b` de la estática; es postproceso o un modelo más rico.
+3. **Pesos** :math:`W` **y cuerdas.** Inputs al armar la armadura, el mismo
+   equilibrio :math:`A x = b`, y esos datos en los resultados. El peso en
+   un nudo, o el de una barra repartido entre sus dos extremos, entra en
+   :math:`b`. Una cuerda cuenta como una incógnita y solo trabaja a
+   tensión; no se suma a un preset que ya sea isostático. Está pedido y
+   **no está en el código**: ni en la librería, ni en la GUI, ni en la
+   imagen Docker. Al implementarlo hay que reconstruir esa imagen.
 
 Unidades
 --------

@@ -394,6 +394,112 @@ def test_graficar_nudo_devuelve_figura():
         armadura.graficar_nudo(9)
 
 
+def test_snapshots_apoyos_y_cargas():
+    armadura = Armadura2D.preset_triangulo()
+    assert armadura.snapshot_apoyos() == ((0, "fijo"), (1, "movil"))
+    assert armadura.snapshot_cargas() == ((2, 0.0, -50.0),)
+    assert armadura.base_ref == pytest.approx(4.0)
+    assert armadura.altura_ref == pytest.approx(3.0)
+
+
+def test_escalar_duplica_la_geometria_del_triangulo():
+    armadura = Armadura2D.preset_triangulo()
+    armadura.escalar(2.0, 2.0)
+    assert armadura.longitud("B1") == pytest.approx(8.0)
+    assert armadura.longitud("B2") == pytest.approx(2.0 * SQRT13)
+    rec = _reacciones(armadura.resolver())
+    assert rec[0].ry == pytest.approx(25.0)
+    assert rec[1].ry == pytest.approx(25.0)
+    with pytest.raises(ValueError, match="0"):
+        armadura.escalar(0.0, 1.0)
+
+
+def test_barras_nulas_sin_carga():
+    armadura = Armadura2D.preset_triangulo()
+    armadura.definir_cargas([])
+    resultado = armadura.resolver()
+    assert all(barra.tipo == "nula" for barra in resultado.fuerzas)
+    for barra in resultado.fuerzas:
+        assert barra.fuerza == pytest.approx(0.0, abs=1e-8)
+    rec = _reacciones(resultado)
+    assert rec[0].rx == pytest.approx(0.0)
+    assert rec[0].ry == pytest.approx(0.0)
+    assert rec[1].ry == pytest.approx(0.0)
+
+
+def test_hiperestatica_barra_extra():
+    armadura = Armadura2D.preset_pratt()
+    armadura.agregar_barra("B10", 3, 2)
+    with pytest.raises(ValueError, match="hiperestática"):
+        armadura.resolver()
+
+
+def test_barra_une_el_nudo_consigo_mismo():
+    armadura = Armadura2D()
+    armadura.agregar_nodo(0, 0.0, 0.0)
+    with pytest.raises(ValueError, match="consigo mismo"):
+        armadura.agregar_barra("B1", 0, 0)
+
+
+def test_barra_id_duplicado():
+    armadura = Armadura2D.preset_triangulo()
+    with pytest.raises(ValueError, match="ya existe"):
+        armadura.agregar_barra("B1", 0, 2)
+
+
+def test_apoyo_duplicado_en_el_mismo_nudo():
+    armadura = Armadura2D.preset_triangulo()
+    with pytest.raises(ValueError, match="ya tiene un apoyo"):
+        armadura.agregar_apoyo(0, "movil")
+
+
+def test_agregar_carga_duplicada():
+    armadura = Armadura2D.preset_triangulo()
+    with pytest.raises(ValueError, match="reemplazar_carga"):
+        armadura.agregar_carga(2, fy=-10.0)
+
+
+def test_definir_apoyos_mismo_nudo():
+    with pytest.raises(ValueError, match="distintos"):
+        Armadura2D.preset_triangulo().definir_apoyos(0, 0)
+
+
+def test_mover_nodo_deja_longitud_cero():
+    armadura = Armadura2D.preset_triangulo()
+    with pytest.raises(ValueError, match="longitud 0"):
+        armadura.mover_nodo(1, 0.0, 0.0)
+    assert armadura.longitud("B1") == pytest.approx(4.0)
+
+
+def test_reemplazar_coordenadas_deja_longitud_cero():
+    armadura = Armadura2D.preset_triangulo()
+    with pytest.raises(ValueError, match="longitud 0"):
+        armadura.reemplazar_coordenadas(
+            {0: (0.0, 0.0), 1: (0.0, 0.0), 2: (2.0, 3.0)}
+        )
+    assert armadura.longitud("B1") == pytest.approx(4.0)
+
+
+def test_verificar_equilibrio_sin_pasar_resultado():
+    chequeo = Armadura2D.preset_triangulo().verificar_equilibrio()
+    assert chequeo.ok
+    assert chequeo.sum_fx == pytest.approx(0.0, abs=1e-8)
+    with pytest.raises(ValueError, match="ResultadoArmadura"):
+        Armadura2D.preset_triangulo().verificar_equilibrio(resultado="no")
+
+
+def test_resolver_sin_nudos():
+    with pytest.raises(ValueError, match="nudos"):
+        Armadura2D().resolver()
+
+
+def test_graficar_nudo_del_rodillo_de_pared():
+    armadura = _armadura_rodillo_pared()
+    figura = armadura.graficar_nudo(1)
+    assert isinstance(figura, Figure)
+    assert "1" in figura.axes[0].get_title()
+
+
 def test_problema_beer_6_1_coincide_con_el_libro():
     """Misma álgebra que el problema resuelto 6.1 (lb y ft, unidades coherentes)."""
     armadura = Armadura2D(nombre="beer-6.1")

@@ -165,6 +165,56 @@ def test_el_encuadre_de_lectura_no_abre_la_malla_de_cuatro_metros():
     assert 3 < y1 < 7
 
 
+def test_no_convierte_un_nudo_en_otro():
+    resultado = _base(
+        nodos=[_nodo(0, 1.0, 2.5)], customdata="nudo:0", x=1.0, y=2.5
+    )
+    assert resultado["cambio"] is False
+    assert resultado["nodos"] == [_nodo(0, 1.0, 2.5)]
+
+
+def test_la_carga_sustituye_la_del_mismo_nudo():
+    previa = [
+        {
+            "nudo": 2,
+            "horizontal →+ (kN)": 1.0,
+            "vertical hacia abajo (kN)": 10.0,
+        }
+    ]
+    resultado = _base(
+        modo="Carga",
+        customdata="nudo:2",
+        nodos=[_nodo(2, 2, 3)],
+        cargas=previa,
+        horizontal=0,
+        vertical_abajo=50,
+    )
+    assert resultado["cambio"] is True
+    assert resultado["cargas"] == [
+        {
+            "nudo": 2,
+            "horizontal →+ (kN)": 0.0,
+            "vertical hacia abajo (kN)": 50.0,
+        }
+    ]
+
+
+def test_cambia_el_movil_de_piso_a_pared():
+    nodos = [_nodo(0, 0, 0), _nodo(1, 4, 0)]
+    resultado = _base(
+        modo="Apoyo",
+        customdata="nudo:1",
+        nodos=nodos,
+        fijo=0,
+        movil=1,
+        tipo_movil="movil",
+        apoyo="movil_pared",
+    )
+    assert resultado["cambio"] is True
+    assert resultado["movil"] == 1
+    assert resultado["tipo_movil"] == "movil_pared"
+
+
 def test_elige_el_otro_extremo_aunque_el_primero_siga_marcado():
     from plano_ui import elegir_punto
 
