@@ -19,11 +19,11 @@ Versión **0.1.0**. Python **≥ 3.10**. Licencia **MIT**.
 |---|---|---|
 | Usar la **librería** | `pip install armadura-2d-andresdperezc` | Cálculos y gráficos matplotlib. **Sin** GUI. |
 | Abrir la **calculadora** (con Python) | Clonar este repo y `streamlit run streamlit_app.py` | GUI en http://localhost:8501 |
-| Abrir la **calculadora** (sin instalar Python) | `docker pull` + `docker run` (puerto 8501) | La misma GUI en el navegador |
+| Abrir la **calculadora** (sin instalar Python) | [Imagen en Docker Hub](https://hub.docker.com/repository/docker/andresperez3/armadura-2d-andresdperezc/general) (`docker pull` + `docker run`, puerto 8501) | La misma GUI en el navegador |
 | Leer la **documentación** | [GitHub Pages](https://wandresp2.github.io/calculador_armadura_2d/) | HTML estático (Sphinx). **No** hospeda Streamlit. |
 
 Repo: [Wandresp2/calculador_armadura_2d](https://github.com/Wandresp2/calculador_armadura_2d).
-Imagen: `andresperez3/armadura-2d-andresdperezc:0.1.0`.
+Imagen: [`andresperez3/armadura-2d-andresdperezc:0.1.0`](https://hub.docker.com/repository/docker/andresperez3/armadura-2d-andresdperezc/general).
 
 ## Requisitos y sistemas
 
