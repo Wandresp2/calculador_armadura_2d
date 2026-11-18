@@ -19,8 +19,10 @@ Abra http://localhost:8501. La página se lee de arriba hacia abajo:
 2. Datos: armadura **precargada** (Triángulo, Warren, Pratt, Howe, con
    base, altura, nudos, apoyos y cargas) o **propia** (tablas para
    agregar y quitar nudos y barras). En la propia, el plano de al lado
-   también crea elementos: nudo en la cuadrícula de 0,5 m, barra entre
-   dos nudos, apoyo o carga sobre un nudo.
+   también crea elementos: nudo en la cuadrícula de 0,5 m (crece 4 m
+   alrededor de los nudos), barra entre dos nudos, apoyo o carga sobre
+   un nudo. Ese plano está en ``plano_ui.py`` y no entra al paquete de
+   PyPI.
 3. Figura con color, fuerza en cada barra, cargas y reacciones.
 4. Tablas de resultados.
 5. Sistema completo de ecuaciones y cuerpo libre de cada nudo

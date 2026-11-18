@@ -24,7 +24,7 @@ RUN apt-get update \
 
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
-COPY streamlit_app.py ./
+COPY streamlit_app.py plano_ui.py ./
 
 RUN pip install --upgrade pip \
     && pip install ".[gui]"

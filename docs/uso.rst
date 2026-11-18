@@ -77,8 +77,9 @@ Edición de números (misma topología)::
 ``movil_pared`` aporta Rx. Si ese rodillo queda a la misma altura que
 el apoyo fijo, el sistema es singular.
 
-La GUI ofrece los cuatro presets y una armadura propia (tablas de
-nudos y barras). ``graficar_nudo`` dibuja el cuerpo libre de un nudo.
+La GUI ofrece los cuatro presets y una armadura propia (tablas o clics
+en el plano). ``graficar_plano`` dibuja la geometría sin resolver.
+``graficar_nudo`` dibuja el cuerpo libre de un nudo.
 
 Gráficos
 --------
@@ -89,6 +90,7 @@ se muestra sola::
 
    fig = triangulo.graficar(r)
    fig.savefig("triangulo.png")
+   triangulo.graficar_plano()   # geometría, sin fuerzas internas
 
 Colores: teal = tensión, oro = compresión, gris = nula. En tests y
 Docker use el backend ``Agg``.

@@ -15,7 +15,8 @@ Alcance de la 0.1.0
 - Sin pórticos, ni momento flector en barras, ni 3D.
 - Sin diámetro, esfuerzo :math:`\sigma = N/A`, pandeo de Euler ni
   códigos NSR/AISC.
-- La armadura propia se arma con tablas. No hay lienzo para dibujarla.
+- La armadura propia se arma con tablas o con clics en el plano
+  (cuadrícula de 0,5 m). No es un dibujo a mano alzada.
 - Unidades fijas **kN** y **m**.
 
 Si el desarrollo se **expande**, hay que **volver a validarlo** (tests +
@@ -24,8 +25,9 @@ esta página).
 Futuro (no es deuda de la 0.1.0)
 --------------------------------
 
-1. **Dibujar la armadura en un lienzo** (la propia ya se arma con
-   tablas y usa el mismo ``resolver()``).
+1. **Dibujar la armadura a mano alzada**, sin la cuadrícula de 0,5 m.
+   La propia ya se arma con tablas o con clics en esa cuadrícula y usa
+   el mismo ``resolver()``.
 2. **Esfuerzo y más variables:** diámetro (o sección) por barra,
    :math:`\sigma = N/A`, quizá material o pandeo. Eso **no** cambia
    :math:`A x = b` de la estática; es postproceso o un modelo más rico.

@@ -95,7 +95,8 @@ El triángulo de libro (base 4 m, altura 3 m, 50 kN hacia abajo en la cúspide) 
 | `longitud(barra)` / `angulo(barra)` | `L` en m y ángulo en radianes |
 | `resolver()` | `ResultadoArmadura` (fuerzas, reacciones, equilibrio) |
 | `verificar_equilibrio(resultado=None)` | Residuos `Σ Fx`, `Σ Fy`, `Σ M` |
-| `graficar(resultado=None)` | `matplotlib.figure.Figure` (no llama a `plt.show()`) |
+| `graficar(resultado=None)` | `matplotlib.figure.Figure` con fuerzas, cargas y reacciones |
+| `graficar_plano()` | La misma geometría sin resolver: nudos, barras, longitudes, apoyos y cargas |
 | `snapshot_nodos()` / `snapshot_barras()` / `snapshot_apoyos()` / `snapshot_cargas()` | Lectura para GUI y scripts (sin tocar `_nodos`) |
 
 Los gráficos **devuelven** la figura. En un script se guarda el PNG; en un notebook se muestra sola. En tests y Docker use el backend `Agg`.
@@ -178,7 +179,7 @@ GitHub Pages: *Settings → Pages → GitHub Actions* (flujo en `.github/workflo
 
 Paso a paso, primero TestPyPI y luego PyPI: [`PUBLICAR_PYPI.md`](PUBLICAR_PYPI.md).
 
-Solo se instala `src/armadura_2d_andresdperezc/`. `streamlit_app.py`, tests, docs, Docker y el notebook quedan fuera del wheel.
+Solo se instala `src/armadura_2d_andresdperezc/`. `streamlit_app.py`, `plano_ui.py`, tests, docs, Docker y el notebook quedan fuera del wheel. La imagen de Docker sí copia esos dos archivos de la interfaz, porque ahí se abre la misma página.
 
 ## Limitaciones (0.1.0)
 
@@ -186,12 +187,12 @@ Solo se instala `src/armadura_2d_andresdperezc/`. `streamlit_app.py`, tests, doc
 - Cargas solo en nudos. Sin peso propio ni carga distribuida en la barra.
 - Apoyos: un fijo (Rx, Ry) y un móvil. El móvil puede estar en un piso (solo Ry) o en una pared vertical (solo Rx). Sin empotramiento ni rodillo inclinado.
 - Sin pórticos, momento flector, 3D, diámetro, esfuerzo `σ = N/A`, pandeo ni códigos NSR/AISC.
-- La armadura propia se arma con tablas (nudos, barras, cargas y apoyos), no con un lienzo de dibujo.
+- La armadura propia se arma con tablas o con clics en el plano (cuadrícula de 0,5 m, que crece alrededor de los nudos). No es un dibujo a mano alzada.
 - Unidades fijas kN y m.
 
 Si el desarrollo se **expande**, hay que **volver a validarlo**.
 
-**Futuro** (no está en esta versión): diámetro o sección por barra y `σ = N/A` como postproceso, sin cambiar `A x = b`. Dibujar la armadura sobre un lienzo, en lugar de tablas, tampoco está.
+**Futuro** (no está en esta versión): diámetro o sección por barra y `σ = N/A` como postproceso, sin cambiar `A x = b`. Dibujar la armadura a mano alzada, sin la cuadrícula de 0,5 m, tampoco está.
 
 ## Autor
 
