@@ -26,12 +26,18 @@ examples/*.png
 CONTEXTO_DESARROLLO.md
 ARQUITECTURA_REPLICABLE.md
 
+# Manual de usuario y archivos para generarlo: se quedan en el equipo
+MANUAL_USUARIO.md
+manual/
+docs/manual_usuario.md
+docs/manual.rts
+docs/manual.rtt
+docs/documentacion.rts
+docs/documentacion.rtt
+
 # IDE
 .cursor/
 .vscode/
 *.swp
 Thumbs.db
 .DS_Store
-
-CONTEXTO_DESARROLLO.md
-ARQUITECTURA_REPLICABLE.md
