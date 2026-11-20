@@ -26,7 +26,8 @@ examples/*.png
 CONTEXTO_DESARROLLO.md
 ARQUITECTURA_REPLICABLE.md
 
-# Manual de usuario y archivos para generarlo: se quedan en el equipo
+# Fuentes del manual: se quedan en el equipo.
+# El PDF de la raíz (manual-usuario.pdf) sí se sube a GitHub.
 MANUAL_USUARIO.md
 manual/
 docs/manual_usuario.md
